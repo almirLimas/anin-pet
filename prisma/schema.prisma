@@ -1,0 +1,223 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Usuários (auth) ──────────────────────────────────────────────────────────
+
+enum Perfil {
+  admin
+  staff
+}
+
+enum StatusUsuario {
+  ativo
+  inativo
+}
+
+model Usuario {
+  id           String        @id @default(cuid())
+  nomeCompleto String
+  email        String        @unique
+  telefone     String?
+  senhaHash    String
+  perfil       Perfil        @default(staff)
+  status       StatusUsuario @default(ativo)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// ── Clientes ─────────────────────────────────────────────────────────────────
+
+enum StatusCliente {
+  Ativo
+  Inativo
+}
+
+model Cliente {
+  id                 String        @id @default(cuid())
+  nome               String
+  cpf                String        @unique
+  telefonePrincipal  String
+  telefoneSecundario String?
+  email              String?
+  cep                String?
+  rua                String?
+  numero             String?
+  complemento        String?
+  bairro             String?
+  cidade             String?
+  estado             String?
+  dataNascimento     String?
+  comoConheceu       String?
+  observacoes        String?
+  status             StatusCliente @default(Ativo)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  pets          Pet[]
+  agendamentos  Agendamento[]
+}
+
+// ── Pets ─────────────────────────────────────────────────────────────────────
+
+model Pet {
+  id             String   @id @default(cuid())
+  nome           String
+  especie        String?
+  raca           String?
+  porte          String?
+  sexo           String?
+  dataNascimento String?
+  cor            String?
+  peso           String?
+  alergias       String?
+  observacoes    String?
+  clienteId      String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  agendamentos Agendamento[]
+  vacinas      Vacina[]
+}
+
+// ── Serviços ──────────────────────────────────────────────────────────────────
+
+enum CategoriaServico {
+  Banho
+  Tosa
+  Consulta
+  Vacina
+  Internacao
+  Cirurgia
+  Exame
+  Outro
+}
+
+enum PorteServico {
+  Pequeno
+  Medio
+  Grande
+  Todos
+}
+
+model Servico {
+  id             String           @id @default(cuid())
+  nome           String
+  categoria      CategoriaServico
+  porte          PorteServico     @default(Todos)
+  duracaoMinutos Int?
+  preco          Decimal          @db.Decimal(10, 2)
+  descricao      String?
+  ativo          Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  agendamentos Agendamento[]
+}
+
+// ── Agenda ───────────────────────────────────────────────────────────────────
+
+enum StatusAgendamento {
+  Agendado
+  Confirmado
+  EmAtendimento
+  Concluido
+  Cancelado
+}
+
+model Agendamento {
+  id          String            @id @default(cuid())
+  dataHora    DateTime
+  observacoes String?
+  status      StatusAgendamento @default(Agendado)
+  clienteId   String
+  petId       String
+  servicoId   String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id])
+  pet      Pet      @relation(fields: [petId], references: [id])
+  servico  Servico  @relation(fields: [servicoId], references: [id])
+}
+
+// ── Estoque ──────────────────────────────────────────────────────────────────
+
+enum CategoriaEstoque {
+  Medicamento
+  Alimento
+  Acessorio
+  Higiene
+  Vacina
+  Outro
+}
+
+model Produto {
+  id              String           @id @default(cuid())
+  nome            String
+  categoria       CategoriaEstoque
+  unidade         String?
+  codigoBarras    String?
+  quantidadeAtual Int              @default(0)
+  estoqueMinimo   Int              @default(0)
+  precoCompra     Decimal          @db.Decimal(10, 2)
+  precoVenda      Decimal?         @db.Decimal(10, 2)
+  descricao       String?
+  ativo           Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  movimentacoes Movimentacao[]
+}
+
+enum TipoMovimentacao {
+  Entrada
+  Saida
+}
+
+model Movimentacao {
+  id            String           @id @default(cuid())
+  tipo          TipoMovimentacao
+  quantidade    Int
+  precoUnitario Decimal?         @db.Decimal(10, 2)
+  motivo        String?
+  observacoes   String?
+  usuarioId     String?
+  produtoId     String
+  createdAt     DateTime         @default(now())
+
+  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+}
+
+// ── Vacinas ──────────────────────────────────────────────────────────────────
+
+enum StatusVacina {
+  Aplicada
+  Pendente
+  Atrasada
+}
+
+model Vacina {
+  id            String       @id @default(cuid())
+  nome          String
+  fabricante    String?
+  lote          String?
+  dataAplicacao DateTime
+  dataReforco   DateTime?
+  status        StatusVacina @default(Aplicada)
+  observacoes   String?
+  petId         String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+}
