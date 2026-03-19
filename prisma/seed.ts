@@ -24,7 +24,7 @@ async function main() {
   const existe = await prisma.usuario.findUnique({ where: { email } });
 
   if (existe) {
-    console.log('✅ Usuário admin já existe, pulando seed.');
+    console.log('✅ Usuário admin já existe, pulando seeds.');
     return;
   }
 
