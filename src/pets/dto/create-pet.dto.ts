@@ -39,6 +39,11 @@ export class CreatePetDto {
   @IsString()
   peso?: string;
 
+  @ApiPropertyOptional({ enum: ['Pequeno', 'Médio', 'Grande', 'Gigante'] })
+  @IsOptional()
+  @IsString()
+  porte?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
