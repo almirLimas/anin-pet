@@ -43,6 +43,7 @@ enum StatusCliente {
 
 model Cliente {
   id                 String        @id @default(cuid())
+  codigo             Int           @unique @default(autoincrement())
   nome               String
   cpf                String        @unique
   telefonePrincipal  String
@@ -220,4 +221,4 @@ model Vacina {
   updatedAt     DateTime     @updatedAt
 
   pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
-}
+}ajuste edi
