@@ -6,9 +6,10 @@ export class CreateClienteDto {
   @IsString()
   nome: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  cpf: string;
+  cpf?: string;
 
   @ApiProperty()
   @IsString()

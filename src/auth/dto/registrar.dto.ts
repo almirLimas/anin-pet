@@ -6,7 +6,7 @@
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Perfil } from '@prisma/client';
+import { Perfil, Plano } from '@prisma/client';
 
 export class RegistrarDto {
   @ApiProperty({ example: 'Ana Veterinaria' })
@@ -27,8 +27,19 @@ export class RegistrarDto {
   @MinLength(6, { message: 'A senha deve ter no minimo 6 caracteres' })
   senha: string;
 
-  @ApiPropertyOptional({ enum: Perfil, default: 'staff' })
+  @ApiPropertyOptional({ enum: Perfil, default: 'admin' })
   @IsOptional()
   @IsEnum(Perfil, { message: 'Perfil invalido. Use admin ou staff' })
   perfil?: Perfil;
+
+  @ApiPropertyOptional({
+    enum: Plano,
+    default: 'basico',
+    description: 'Plano contratado pelo dono do negocio',
+  })
+  @IsOptional()
+  @IsEnum(Plano, {
+    message: 'Plano invalido. Use basico, profissional ou completo',
+  })
+  plano?: Plano;
 }

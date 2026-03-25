@@ -61,7 +61,8 @@ export class AuthService {
         email: dto.email,
         telefone: dto.telefone,
         senhaHash,
-        perfil: dto.perfil ?? 'staff',
+        perfil: dto.perfil ?? 'admin',
+        plano: dto.plano ?? 'basico',
       },
     });
 
@@ -70,6 +71,7 @@ export class AuthService {
       nomeCompleto: usuario.nomeCompleto,
       email: usuario.email,
       perfil: usuario.perfil,
+      plano: usuario.plano,
     };
   }
 

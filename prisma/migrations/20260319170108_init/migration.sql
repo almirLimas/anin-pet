@@ -5,6 +5,9 @@ CREATE TYPE "Perfil" AS ENUM ('admin', 'staff');
 CREATE TYPE "StatusUsuario" AS ENUM ('ativo', 'inativo');
 
 -- CreateEnum
+CREATE TYPE "Plano" AS ENUM ('basico', 'profissional', 'completo');
+
+-- CreateEnum
 CREATE TYPE "StatusCliente" AS ENUM ('Ativo', 'Inativo');
 
 -- CreateEnum
@@ -32,7 +35,8 @@ CREATE TABLE "Usuario" (
     "email" TEXT NOT NULL,
     "telefone" TEXT,
     "senhaHash" TEXT NOT NULL,
-    "perfil" "Perfil" NOT NULL DEFAULT 'staff',
+    "perfil" "Perfil" NOT NULL DEFAULT 'admin',
+    "plano" "Plano" NOT NULL DEFAULT 'basico',
     "status" "StatusUsuario" NOT NULL DEFAULT 'ativo',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -43,8 +47,9 @@ CREATE TABLE "Usuario" (
 -- CreateTable
 CREATE TABLE "Cliente" (
     "id" TEXT NOT NULL,
+    "codigo" SERIAL NOT NULL,
     "nome" TEXT NOT NULL,
-    "cpf" TEXT NOT NULL,
+    "cpf" TEXT,
     "telefonePrincipal" TEXT NOT NULL,
     "telefoneSecundario" TEXT,
     "email" TEXT,
@@ -169,6 +174,9 @@ CREATE TABLE "Vacina" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Usuario_email_key" ON "Usuario"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Cliente_codigo_key" ON "Cliente"("codigo");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Cliente_cpf_key" ON "Cliente"("cpf");

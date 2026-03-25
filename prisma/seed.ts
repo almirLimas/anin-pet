@@ -36,6 +36,7 @@ async function main() {
       email,
       senhaHash,
       perfil: 'admin',
+      plano: 'completo',
       status: 'ativo',
     },
   });
