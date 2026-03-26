@@ -22,10 +22,8 @@ export class AgendaService {
     const where: Record<string, unknown> = {};
 
     if (data) {
-      const inicio = new Date(data);
-      inicio.setHours(0, 0, 0, 0);
-      const fim = new Date(data);
-      fim.setHours(23, 59, 59, 999);
+      const inicio = new Date(`${data}T00:00:00`);
+      const fim = new Date(`${data}T23:59:59.999`);
       where['dataHora'] = { gte: inicio, lte: fim };
     }
 

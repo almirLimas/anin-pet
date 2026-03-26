@@ -142,11 +142,17 @@ enum StatusAgendamento {
   Cancelado
 }
 
+enum ModalidadeAgendamento {
+  ClienteTraz
+  PetshopBusca
+}
+
 model Agendamento {
-  id          String            @id @default(cuid())
+  id          String                 @id @default(cuid())
   dataHora    DateTime
   observacoes String?
-  status      StatusAgendamento @default(Agendado)
+  status      StatusAgendamento      @default(Agendado)
+  modalidade  ModalidadeAgendamento  @default(ClienteTraz)
   clienteId   String
   petId       String
   servicoId   String

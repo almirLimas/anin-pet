@@ -1,6 +1,6 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { StatusAgendamento } from '@prisma/client';
+import { ModalidadeAgendamento, StatusAgendamento } from '@prisma/client';
 
 export class CreateAgendamentoDto {
   @ApiProperty()
@@ -23,6 +23,11 @@ export class CreateAgendamentoDto {
   @IsOptional()
   @IsEnum(StatusAgendamento)
   status?: StatusAgendamento;
+
+  @ApiPropertyOptional({ enum: ModalidadeAgendamento })
+  @IsOptional()
+  @IsEnum(ModalidadeAgendamento)
+  modalidade?: ModalidadeAgendamento;
 
   @ApiPropertyOptional()
   @IsOptional()

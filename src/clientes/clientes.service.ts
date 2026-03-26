@@ -56,27 +56,32 @@ export class ClientesService {
   }
 
   async create(dto: CreateClienteDto) {
-    const existing = await this.prisma.cliente.findUnique({
-      where: { cpf: dto.cpf },
-    });
+    const cpf = dto.cpf?.trim() || undefined;
 
-    if (existing) throw new ConflictException('CPF já cadastrado');
+    if (cpf) {
+      const existing = await this.prisma.cliente.findUnique({
+        where: { cpf },
+      });
+      if (existing) throw new ConflictException('CPF já cadastrado');
+    }
 
-    return this.prisma.cliente.create({ data: dto });
+    return this.prisma.cliente.create({ data: { ...dto, cpf } });
   }
 
   async update(id: string, dto: UpdateClienteDto) {
     await this.findOne(id);
 
-    if (dto.cpf) {
+    const cpf = dto.cpf?.trim() || undefined;
+
+    if (cpf) {
       const existing = await this.prisma.cliente.findFirst({
-        where: { cpf: dto.cpf, NOT: { id } },
+        where: { cpf, NOT: { id } },
       });
       if (existing)
         throw new ConflictException('CPF já cadastrado para outro cliente');
     }
 
-    return this.prisma.cliente.update({ where: { id }, data: dto });
+    return this.prisma.cliente.update({ where: { id }, data: { ...dto, cpf } });
   }
 
   async remove(id: string) {
