@@ -160,9 +160,40 @@ model Agendamento {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  cliente  Cliente  @relation(fields: [clienteId], references: [id])
-  pet      Pet      @relation(fields: [petId], references: [id])
-  servico  Servico  @relation(fields: [servicoId], references: [id])
+  cliente     Cliente      @relation(fields: [clienteId], references: [id])
+  pet         Pet          @relation(fields: [petId], references: [id])
+  servico     Servico      @relation(fields: [servicoId], references: [id])
+  lancamentos Lancamento[]
+}
+
+// ── Financeiro ───────────────────────────────────────────────────────────────────────
+
+enum TipoLancamento {
+  Receita
+  Despesa
+}
+
+enum CategoriaLancamento {
+  Servico
+  Produto
+  Consulta
+  Material
+  Manutencao
+  Outro
+}
+
+model Lancamento {
+  id            String              @id @default(cuid())
+  tipo          TipoLancamento
+  valor         Decimal             @db.Decimal(10, 2)
+  descricao     String
+  categoria     CategoriaLancamento @default(Outro)
+  data          DateTime            @default(now())
+  agendamentoId String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
 }
 
 // ── Estoque ──────────────────────────────────────────────────────────────────

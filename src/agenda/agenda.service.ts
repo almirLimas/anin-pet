@@ -3,10 +3,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
+import { FinanceiroService } from '../financeiro/financeiro.service';
 
 @Injectable()
 export class AgendaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly financeiro: FinanceiroService,
+  ) {}
 
   private get include() {
     return {
@@ -59,7 +63,7 @@ export class AgendaService {
 
   async update(id: string, dto: UpdateAgendamentoDto) {
     await this.findOne(id);
-    return this.prisma.agendamento.update({
+    const atualizado = await this.prisma.agendamento.update({
       where: { id },
       data: {
         ...dto,
@@ -67,6 +71,24 @@ export class AgendaService {
       } as Prisma.AgendamentoUncheckedUpdateInput,
       include: this.include,
     });
+
+    // Auto-lançamento financeiro ao concluir
+    if (dto.status === 'Concluido') {
+      const jaExiste = await this.prisma.lancamento.findFirst({
+        where: { agendamentoId: id },
+      });
+      if (!jaExiste) {
+        await this.financeiro.criar({
+          tipo: 'Receita',
+          valor: Number(atualizado.servico.preco),
+          descricao: `${atualizado.servico.nome} — ${atualizado.pet.nome}`,
+          categoria: 'Servico',
+          agendamentoId: id,
+        });
+      }
+    }
+
+    return atualizado;
   }
 
   async remove(id: string) {
