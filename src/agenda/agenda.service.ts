@@ -73,4 +73,27 @@ export class AgendaService {
     await this.findOne(id);
     return this.prisma.agendamento.delete({ where: { id } });
   }
+
+  /** Agendamentos cujo horário já passou e ainda não tiveram ação */
+  async findPendentes() {
+    return this.prisma.agendamento.findMany({
+      where: {
+        dataHora: { lt: new Date() },
+        status: { in: ['Agendado', 'Confirmado'] },
+      },
+      orderBy: { dataHora: 'asc' },
+      include: this.include,
+    });
+  }
+
+  /** Marca como NaoCompareceu todos os agendamentos passados sem ação (chamado pelo cron) */
+  async marcarNaoCompareceu() {
+    return this.prisma.agendamento.updateMany({
+      where: {
+        dataHora: { lt: new Date() },
+        status: { in: ['Agendado', 'Confirmado'] },
+      },
+      data: { status: 'NaoCompareceu' },
+    });
+  }
 }

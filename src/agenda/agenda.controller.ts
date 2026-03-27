@@ -29,6 +29,11 @@ export class AgendaController {
     return this.agendaService.findAll(data, status);
   }
 
+  @Get('pendentes')
+  findPendentes() {
+    return this.agendaService.findPendentes();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.agendaService.findOne(id);

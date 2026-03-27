@@ -140,6 +140,7 @@ enum StatusAgendamento {
   EmAtendimento
   Concluido
   Cancelado
+  NaoCompareceu
 }
 
 enum ModalidadeAgendamento {
