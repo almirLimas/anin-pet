@@ -14,16 +14,17 @@ export class EstoqueService {
 
   // ─── Produtos ───────────────────────────────────────────────
 
-  async findAllProdutos(busca?: string, alertas = false) {
+  async findAllProdutos(tenantId: string, busca?: string, alertas = false) {
     const produtos = await this.prisma.produto.findMany({
       where: busca
         ? {
+            tenantId,
             OR: [
               { nome: { contains: busca, mode: 'insensitive' as const } },
               { codigoBarras: { contains: busca } },
             ],
           }
-        : undefined,
+        : { tenantId },
       orderBy: { nome: 'asc' },
     });
 
@@ -32,39 +33,45 @@ export class EstoqueService {
     return produtos;
   }
 
-  async findOneProduto(id: string) {
-    const produto = await this.prisma.produto.findUnique({ where: { id } });
+  async findOneProduto(tenantId: string, id: string) {
+    const produto = await this.prisma.produto.findFirst({
+      where: { id, tenantId },
+    });
     if (!produto) throw new NotFoundException('Produto não encontrado');
     return produto;
   }
 
-  async createProduto(dto: CreateProdutoDto) {
-    return this.prisma.produto.create({ data: dto });
+  async createProduto(tenantId: string, dto: CreateProdutoDto) {
+    return this.prisma.produto.create({ data: { ...dto, tenantId } });
   }
 
-  async updateProduto(id: string, dto: UpdateProdutoDto) {
-    await this.findOneProduto(id);
+  async updateProduto(tenantId: string, id: string, dto: UpdateProdutoDto) {
+    await this.findOneProduto(tenantId, id);
     return this.prisma.produto.update({ where: { id }, data: dto });
   }
 
-  async removeProduto(id: string) {
-    await this.findOneProduto(id);
+  async removeProduto(tenantId: string, id: string) {
+    await this.findOneProduto(tenantId, id);
     return this.prisma.produto.delete({ where: { id } });
   }
 
   // ─── Movimentações ──────────────────────────────────────────
 
-  async findAllMovimentacoes(produtoId?: string) {
+  async findAllMovimentacoes(tenantId: string, produtoId?: string) {
     return this.prisma.movimentacao.findMany({
-      where: produtoId ? { produtoId } : undefined,
+      where: produtoId ? { tenantId, produtoId } : { tenantId },
       orderBy: { createdAt: 'desc' },
       take: 100,
       include: { produto: { select: { id: true, nome: true, unidade: true } } },
     });
   }
 
-  async createMovimentacao(dto: CreateMovimentacaoDto, usuarioId: string) {
-    const produto = await this.findOneProduto(dto.produtoId);
+  async createMovimentacao(
+    tenantId: string,
+    dto: CreateMovimentacaoDto,
+    usuarioId: string,
+  ) {
+    const produto = await this.findOneProduto(tenantId, dto.produtoId);
 
     const novaQuantidade =
       dto.tipo === 'Entrada'
@@ -77,7 +84,7 @@ export class EstoqueService {
 
     const [movimentacao] = await this.prisma.$transaction([
       this.prisma.movimentacao.create({
-        data: { ...dto, usuarioId },
+        data: { ...dto, usuarioId, tenantId },
         include: {
           produto: { select: { id: true, nome: true, unidade: true } },
         },

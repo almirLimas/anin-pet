@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { VacinasService } from './vacinas.service';
 import { CreateVacinaDto } from './dto/create-vacina.dto';
 import { UpdateVacinaDto } from './dto/update-vacina.dto';
@@ -29,27 +30,44 @@ export class VacinasController {
     required: false,
     enum: ['Aplicada', 'Pendente', 'Atrasada'],
   })
-  findAll(@Query('petId') petId?: string, @Query('status') status?: string) {
-    return this.vacinasService.findAll(petId, status);
+  findAll(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('petId') petId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.vacinasService.findAll(usuario.tenantId, petId, status);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.vacinasService.findOne(id);
+  findOne(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.vacinasService.findOne(usuario.tenantId, id);
   }
 
   @Post()
-  create(@Body() dto: CreateVacinaDto) {
-    return this.vacinasService.create(dto);
+  create(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreateVacinaDto,
+  ) {
+    return this.vacinasService.create(usuario.tenantId, dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateVacinaDto) {
-    return this.vacinasService.update(id, dto);
+  update(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateVacinaDto,
+  ) {
+    return this.vacinasService.update(usuario.tenantId, id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.vacinasService.remove(id);
+  remove(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.vacinasService.remove(usuario.tenantId, id);
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { FinanceiroService } from './financeiro.service';
 import { CreateLancamentoDto } from './dto/create-lancamento.dto';
 import { TipoLancamento } from '@prisma/client';
@@ -27,39 +28,56 @@ export class FinanceiroController {
   @ApiQuery({ name: 'dataFim', required: false })
   @ApiQuery({ name: 'tipo', required: false, enum: TipoLancamento })
   listar(
+    @UsuarioAtual() usuario: { tenantId: string },
     @Query('dataInicio') dataInicio?: string,
     @Query('dataFim') dataFim?: string,
     @Query('tipo') tipo?: TipoLancamento,
   ) {
-    return this.financeiroService.listar({ dataInicio, dataFim, tipo });
+    return this.financeiroService.listar(usuario.tenantId, {
+      dataInicio,
+      dataFim,
+      tipo,
+    });
   }
 
   @Get('resumo-mes')
   @ApiQuery({ name: 'ano', required: false })
   @ApiQuery({ name: 'mes', required: false })
-  resumoMes(@Query('ano') ano?: string, @Query('mes') mes?: string) {
+  resumoMes(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('ano') ano?: string,
+    @Query('mes') mes?: string,
+  ) {
     const now = new Date();
     return this.financeiroService.resumoMes(
+      usuario.tenantId,
       ano ? Number(ano) : now.getFullYear(),
       mes ? Number(mes) : now.getMonth() + 1,
     );
   }
 
   @Post('lancamentos')
-  criar(@Body() dto: CreateLancamentoDto) {
-    return this.financeiroService.criar(dto);
+  criar(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreateLancamentoDto,
+  ) {
+    return this.financeiroService.criar(dto, usuario.tenantId);
   }
 
   @Patch('lancamentos/:id')
   atualizar(
+    @UsuarioAtual() usuario: { tenantId: string },
     @Param('id') id: string,
     @Body() dto: Partial<CreateLancamentoDto>,
   ) {
-    return this.financeiroService.atualizar(id, dto);
+    return this.financeiroService.atualizar(usuario.tenantId, id, dto);
   }
 
   @Delete('lancamentos/:id')
-  remover(@Param('id') id: string) {
-    return this.financeiroService.remover(id);
+  remover(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.financeiroService.remover(usuario.tenantId, id);
   }
 }

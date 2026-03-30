@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class RelatoriosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Resumo do mês ─────────────────────────────────────────────────────────
+  // â”€â”€ Resumo do mÃªs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async resumoMes(mes: string) {
+  async resumoMes(tenantId: string, mes: string) {
     const [ano, mesNum] = mes.split('-').map(Number);
     const inicio = new Date(ano, mesNum - 1, 1);
     const fim = new Date(ano, mesNum, 1);
@@ -21,26 +21,27 @@ export class RelatoriosService {
       clientesNaoVoltaram,
     ] = await Promise.all([
       this.prisma.cliente.count({
-        where: { createdAt: { gte: inicio, lt: fim } },
+        where: { tenantId, createdAt: { gte: inicio, lt: fim } },
       }),
 
       this.prisma.cliente.count({
-        where: { status: 'Ativo' },
+        where: { tenantId, status: 'Ativo' },
       }),
 
       this.prisma.agendamento.groupBy({
         by: ['status'],
-        where: { dataHora: { gte: inicio, lt: fim } },
+        where: { tenantId, dataHora: { gte: inicio, lt: fim } },
         _count: { id: true },
       }),
 
       this.prisma.lancamento.aggregate({
-        where: { tipo: 'Receita', data: { gte: inicio, lt: fim } },
+        where: { tenantId, tipo: 'Receita', data: { gte: inicio, lt: fim } },
         _sum: { valor: true },
       }),
 
       this.prisma.agendamento.findMany({
         where: {
+          tenantId,
           dataHora: { gte: inicio, lt: fim },
           status: { in: ['Concluido', 'EmAtendimento', 'Confirmado'] },
         },
@@ -48,8 +49,8 @@ export class RelatoriosService {
         distinct: ['clienteId'],
       }),
 
-      // clientes que não voltaram nos últimos 30 dias (para destaque no card)
-      this._contarNaoVoltaram(30),
+      // clientes que nÃ£o voltaram nos Ãºltimos 30 dias (para destaque no card)
+      this._contarNaoVoltaram(tenantId, 30),
     ]);
 
     const totalAgendamentos = agendamentosMes.reduce(
@@ -86,14 +87,13 @@ export class RelatoriosService {
     };
   }
 
-  // ── Clientes que não voltaram ─────────────────────────────────────────────
+  // â”€â”€ Clientes que nÃ£o voltaram â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async clientesNaoVoltaram(dias = 30) {
+  async clientesNaoVoltaram(tenantId: string, dias = 30) {
     const agora = new Date();
     const dataCorte = new Date();
     dataCorte.setDate(dataCorte.getDate() - dias);
 
-    // Busca clientes com último agendamento concluído antigo e sem futuro agendamento ativo
     const resultado = await this.prisma.$queryRaw<
       {
         id: string;
@@ -117,6 +117,7 @@ export class RelatoriosService {
       WHERE
         a.status = 'Concluido'
         AND c.status = 'Ativo'
+        AND c."tenantId" = ${tenantId}
       GROUP BY c.id, c.nome, c."telefonePrincipal", c.email
       HAVING
         MAX(a."dataHora") < ${dataCorte}
@@ -143,16 +144,20 @@ export class RelatoriosService {
     };
   }
 
-  // ── Serviços mais populares ───────────────────────────────────────────────
+  // â”€â”€ ServiÃ§os mais populares â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  async servicosPopulares(mes: string) {
+  async servicosPopulares(tenantId: string, mes: string) {
     const [ano, mesNum] = mes.split('-').map(Number);
     const inicio = new Date(ano, mesNum - 1, 1);
     const fim = new Date(ano, mesNum, 1);
 
     const grupos = await this.prisma.agendamento.groupBy({
       by: ['servicoId'],
-      where: { dataHora: { gte: inicio, lt: fim }, status: 'Concluido' },
+      where: {
+        tenantId,
+        dataHora: { gte: inicio, lt: fim },
+        status: 'Concluido',
+      },
       _count: { id: true },
       orderBy: { _count: { id: 'desc' } },
       take: 10,
@@ -162,7 +167,7 @@ export class RelatoriosService {
 
     const ids = grupos.map((g) => g.servicoId);
     const detalhes = await this.prisma.servico.findMany({
-      where: { id: { in: ids } },
+      where: { tenantId, id: { in: ids } },
       select: { id: true, nome: true, categoria: true, preco: true },
     });
 
@@ -178,9 +183,12 @@ export class RelatoriosService {
     });
   }
 
-  // ── helper privado ────────────────────────────────────────────────────────
+  // â”€â”€ helper privado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  private async _contarNaoVoltaram(dias: number): Promise<number> {
+  private async _contarNaoVoltaram(
+    tenantId: string,
+    dias: number,
+  ): Promise<number> {
     const agora = new Date();
     const dataCorte = new Date();
     dataCorte.setDate(dataCorte.getDate() - dias);
@@ -189,7 +197,9 @@ export class RelatoriosService {
       SELECT c.id
       FROM "Cliente" c
       JOIN "Agendamento" a ON a."clienteId" = c.id
-      WHERE a.status = 'Concluido' AND c.status = 'Ativo'
+      WHERE a.status = 'Concluido'
+        AND c.status = 'Ativo'
+        AND c."tenantId" = ${tenantId}
       GROUP BY c.id
       HAVING
         MAX(a."dataHora") < ${dataCorte}

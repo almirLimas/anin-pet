@@ -22,8 +22,8 @@ export class AgendaService {
     };
   }
 
-  async findAll(data?: string, status?: string) {
-    const where: Record<string, unknown> = {};
+  async findAll(tenantId: string, data?: string, status?: string) {
+    const where: Record<string, unknown> = { tenantId };
 
     if (data) {
       const inicio = new Date(`${data}T00:00:00`);
@@ -42,27 +42,28 @@ export class AgendaService {
     });
   }
 
-  async findOne(id: string) {
-    const agendamento = await this.prisma.agendamento.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const agendamento = await this.prisma.agendamento.findFirst({
+      where: { id, tenantId },
       include: this.include,
     });
     if (!agendamento) throw new NotFoundException('Agendamento não encontrado');
     return agendamento;
   }
 
-  async create(dto: CreateAgendamentoDto) {
+  async create(tenantId: string, dto: CreateAgendamentoDto) {
     return this.prisma.agendamento.create({
       data: {
         ...dto,
+        tenantId,
         dataHora: new Date(dto.dataHora),
       },
       include: this.include,
     });
   }
 
-  async update(id: string, dto: UpdateAgendamentoDto) {
-    await this.findOne(id);
+  async update(tenantId: string, id: string, dto: UpdateAgendamentoDto) {
+    await this.findOne(tenantId, id);
     const atualizado = await this.prisma.agendamento.update({
       where: { id },
       data: {
@@ -78,28 +79,32 @@ export class AgendaService {
         where: { agendamentoId: id },
       });
       if (!jaExiste) {
-        await this.financeiro.criar({
-          tipo: 'Receita',
-          valor: Number(atualizado.servico.preco),
-          descricao: `${atualizado.servico.nome} — ${atualizado.pet.nome}`,
-          categoria: 'Servico',
-          agendamentoId: id,
-        });
+        await this.financeiro.criar(
+          {
+            tipo: 'Receita',
+            valor: Number(atualizado.servico.preco),
+            descricao: `${atualizado.servico.nome} — ${atualizado.pet.nome}`,
+            categoria: 'Servico',
+            agendamentoId: id,
+          },
+          tenantId,
+        );
       }
     }
 
     return atualizado;
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
     return this.prisma.agendamento.delete({ where: { id } });
   }
 
   /** Agendamentos cujo horário já passou e ainda não tiveram ação */
-  async findPendentes() {
+  async findPendentes(tenantId: string) {
     return this.prisma.agendamento.findMany({
       where: {
+        tenantId,
         dataHora: { lt: new Date() },
         status: { in: ['Agendado', 'Confirmado'] },
       },
@@ -108,7 +113,7 @@ export class AgendaService {
     });
   }
 
-  /** Marca como NaoCompareceu todos os agendamentos passados sem ação (chamado pelo cron) */
+  /** Marca como NaoCompareceu todos os agendamentos passados sem ação (chamado pelo cron global) */
   async marcarNaoCompareceu() {
     return this.prisma.agendamento.updateMany({
       where: {

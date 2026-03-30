@@ -10,7 +10,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// ── Usuários (auth) ──────────────────────────────────────────────────────────
+// ── Enums ─────────────────────────────────────────────────────────────────────
 
 enum Perfil {
   admin
@@ -28,6 +28,29 @@ enum Plano {
   completo
 }
 
+// ── Tenant (petshop) ─────────────────────────────────────────────────────────
+
+model Tenant {
+  id        String        @id @default(cuid())
+  nome      String
+  plano     Plano         @default(basico)
+  status    StatusUsuario @default(ativo)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  usuarios      Usuario[]
+  clientes      Cliente[]
+  pets          Pet[]
+  servicos      Servico[]
+  agendamentos  Agendamento[]
+  lancamentos   Lancamento[]
+  produtos      Produto[]
+  movimentacoes Movimentacao[]
+  vacinas       Vacina[]
+}
+
+// ── Usuários (auth) ──────────────────────────────────────────────────────────
+
 model Usuario {
   id           String        @id @default(cuid())
   nomeCompleto String
@@ -35,10 +58,12 @@ model Usuario {
   telefone     String?
   senhaHash    String
   perfil       Perfil        @default(admin)
-  plano        Plano         @default(basico)
   status       StatusUsuario @default(ativo)
+  tenantId     String
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 }
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
@@ -50,9 +75,9 @@ enum StatusCliente {
 
 model Cliente {
   id                 String        @id @default(cuid())
-  codigo             Int           @unique @default(autoincrement())
+  codigo             Int           @default(autoincrement())
   nome               String
-  cpf                String?       @unique
+  cpf                String?
   telefonePrincipal  String
   telefoneSecundario String?
   email              String?
@@ -67,11 +92,16 @@ model Cliente {
   comoConheceu       String?
   observacoes        String?
   status             StatusCliente @default(Ativo)
+  tenantId           String
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  pets          Pet[]
-  agendamentos  Agendamento[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  pets         Pet[]
+  agendamentos Agendamento[]
+
+  @@unique([tenantId, cpf])
+  @@unique([tenantId, codigo])
 }
 
 // ── Pets ─────────────────────────────────────────────────────────────────────
@@ -89,9 +119,11 @@ model Pet {
   alergias       String?
   observacoes    String?
   clienteId      String
+  tenantId       String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
   cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   agendamentos Agendamento[]
   vacinas      Vacina[]
@@ -126,9 +158,11 @@ model Servico {
   preco          Decimal          @db.Decimal(10, 2)
   descricao      String?
   ativo          Boolean          @default(true)
+  tenantId       String
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
   agendamentos Agendamento[]
 }
 
@@ -157,9 +191,11 @@ model Agendamento {
   clienteId   String
   petId       String
   servicoId   String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  tenantId    String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
   cliente     Cliente      @relation(fields: [clienteId], references: [id])
   pet         Pet          @relation(fields: [petId], references: [id])
   servico     Servico      @relation(fields: [servicoId], references: [id])
@@ -190,9 +226,11 @@ model Lancamento {
   categoria     CategoriaLancamento @default(Outro)
   data          DateTime            @default(now())
   agendamentoId String?
+  tenantId      String
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
   agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
 }
 
@@ -219,9 +257,11 @@ model Produto {
   precoVenda      Decimal?         @db.Decimal(10, 2)
   descricao       String?
   ativo           Boolean          @default(true)
+  tenantId        String
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
   movimentacoes Movimentacao[]
 }
 
@@ -239,8 +279,10 @@ model Movimentacao {
   observacoes   String?
   usuarioId     String?
   produtoId     String
+  tenantId      String
   createdAt     DateTime         @default(now())
 
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
   produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 }
 
@@ -262,8 +304,10 @@ model Vacina {
   status        StatusVacina @default(Aplicada)
   observacoes   String?
   petId         String
+  tenantId      String
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  pet    Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
 }

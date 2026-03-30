@@ -30,45 +30,73 @@ export class EstoqueController {
   @ApiQuery({ name: 'busca', required: false })
   @ApiQuery({ name: 'alertas', required: false, type: Boolean })
   findAllProdutos(
+    @UsuarioAtual() usuario: { tenantId: string },
     @Query('busca') busca?: string,
     @Query('alertas') alertas?: string,
   ) {
-    return this.estoqueService.findAllProdutos(busca, alertas === 'true');
+    return this.estoqueService.findAllProdutos(
+      usuario.tenantId,
+      busca,
+      alertas === 'true',
+    );
   }
 
   @Get('produtos/:id')
-  findOneProduto(@Param('id') id: string) {
-    return this.estoqueService.findOneProduto(id);
+  findOneProduto(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.estoqueService.findOneProduto(usuario.tenantId, id);
   }
 
   @Post('produtos')
-  createProduto(@Body() dto: CreateProdutoDto) {
-    return this.estoqueService.createProduto(dto);
+  createProduto(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreateProdutoDto,
+  ) {
+    return this.estoqueService.createProduto(usuario.tenantId, dto);
   }
 
   @Patch('produtos/:id')
-  updateProduto(@Param('id') id: string, @Body() dto: UpdateProdutoDto) {
-    return this.estoqueService.updateProduto(id, dto);
+  updateProduto(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateProdutoDto,
+  ) {
+    return this.estoqueService.updateProduto(usuario.tenantId, id, dto);
   }
 
   @Delete('produtos/:id')
-  removeProduto(@Param('id') id: string) {
-    return this.estoqueService.removeProduto(id);
+  removeProduto(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.estoqueService.removeProduto(usuario.tenantId, id);
   }
 
   // ─── Movimentações ──────────────────────────────────────────
 
   @Get('movimentacoes')
   @ApiQuery({ name: 'produtoId', required: false })
-  findAllMovimentacoes(@Query('produtoId') produtoId?: string) {
-    return this.estoqueService.findAllMovimentacoes(produtoId);
+  findAllMovimentacoes(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('produtoId') produtoId?: string,
+  ) {
+    return this.estoqueService.findAllMovimentacoes(
+      usuario.tenantId,
+      produtoId,
+    );
   }
 
   @Post('movimentacoes')
   createMovimentacao(
     @Body() dto: CreateMovimentacaoDto,
-    @UsuarioAtual() usuario: { id: string },
+    @UsuarioAtual() usuario: { id: string; tenantId: string },
   ) {
-    return this.estoqueService.createMovimentacao(dto, usuario.id);
+    return this.estoqueService.createMovimentacao(
+      usuario.tenantId,
+      dto,
+      usuario.id,
+    );
   }
 }

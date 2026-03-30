@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { PetsService } from './pets.service';
 import { CreatePetDto } from './dto/create-pet.dto';
 import { UpdatePetDto } from './dto/update-pet.dto';
@@ -24,27 +25,43 @@ export class PetsController {
 
   @Get()
   @ApiQuery({ name: 'clienteId', required: false })
-  findAll(@Query('clienteId') clienteId?: string) {
-    return this.petsService.findAll(clienteId);
+  findAll(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('clienteId') clienteId?: string,
+  ) {
+    return this.petsService.findAll(usuario.tenantId, clienteId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.petsService.findOne(id);
+  findOne(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.petsService.findOne(usuario.tenantId, id);
   }
 
   @Post()
-  create(@Body() dto: CreatePetDto) {
-    return this.petsService.create(dto);
+  create(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreatePetDto,
+  ) {
+    return this.petsService.create(usuario.tenantId, dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePetDto) {
-    return this.petsService.update(id, dto);
+  update(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdatePetDto,
+  ) {
+    return this.petsService.update(usuario.tenantId, id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.petsService.remove(id);
+  remove(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.petsService.remove(usuario.tenantId, id);
   }
 }

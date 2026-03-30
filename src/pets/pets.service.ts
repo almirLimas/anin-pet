@@ -7,17 +7,17 @@ import { UpdatePetDto } from './dto/update-pet.dto';
 export class PetsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(clienteId?: string) {
+  async findAll(tenantId: string, clienteId?: string) {
     return this.prisma.pet.findMany({
-      where: clienteId ? { clienteId } : undefined,
+      where: clienteId ? { tenantId, clienteId } : { tenantId },
       orderBy: { nome: 'asc' },
       include: { cliente: { select: { id: true, nome: true } } },
     });
   }
 
-  async findOne(id: string) {
-    const pet = await this.prisma.pet.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const pet = await this.prisma.pet.findFirst({
+      where: { id, tenantId },
       include: {
         cliente: true,
         vacinas: { orderBy: { dataAplicacao: 'desc' } },
@@ -32,17 +32,17 @@ export class PetsService {
     return pet;
   }
 
-  async create(dto: CreatePetDto) {
-    return this.prisma.pet.create({ data: dto });
+  async create(tenantId: string, dto: CreatePetDto) {
+    return this.prisma.pet.create({ data: { ...dto, tenantId } });
   }
 
-  async update(id: string, dto: UpdatePetDto) {
-    await this.findOne(id);
+  async update(tenantId: string, id: string, dto: UpdatePetDto) {
+    await this.findOne(tenantId, id);
     return this.prisma.pet.update({ where: { id }, data: dto });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
     return this.prisma.pet.delete({ where: { id } });
   }
 }

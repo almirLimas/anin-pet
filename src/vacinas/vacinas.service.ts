@@ -21,9 +21,10 @@ export class VacinasService {
     };
   }
 
-  async findAll(petId?: string, status?: string) {
+  async findAll(tenantId: string, petId?: string, status?: string) {
     return this.prisma.vacina.findMany({
       where: {
+        tenantId,
         ...(petId && { petId }),
         ...(status && { status: status as StatusVacina }),
       },
@@ -32,19 +33,20 @@ export class VacinasService {
     });
   }
 
-  async findOne(id: string) {
-    const vacina = await this.prisma.vacina.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const vacina = await this.prisma.vacina.findFirst({
+      where: { id, tenantId },
       include: this.include,
     });
     if (!vacina) throw new NotFoundException('Vacina não encontrada');
     return vacina;
   }
 
-  async create(dto: CreateVacinaDto) {
+  async create(tenantId: string, dto: CreateVacinaDto) {
     return this.prisma.vacina.create({
       data: {
         ...dto,
+        tenantId,
         dataAplicacao: new Date(dto.dataAplicacao),
         ...(dto.dataReforco && { dataReforco: new Date(dto.dataReforco) }),
       },
@@ -52,8 +54,8 @@ export class VacinasService {
     });
   }
 
-  async update(id: string, dto: UpdateVacinaDto) {
-    await this.findOne(id);
+  async update(tenantId: string, id: string, dto: UpdateVacinaDto) {
+    await this.findOne(tenantId, id);
     return this.prisma.vacina.update({
       where: { id },
       data: {
@@ -67,8 +69,8 @@ export class VacinasService {
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
     return this.prisma.vacina.delete({ where: { id } });
   }
 }

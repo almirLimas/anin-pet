@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { AgendaService } from './agenda.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
@@ -25,32 +26,49 @@ export class AgendaController {
   @Get()
   @ApiQuery({ name: 'data', required: false, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'status', required: false })
-  findAll(@Query('data') data?: string, @Query('status') status?: string) {
-    return this.agendaService.findAll(data, status);
+  findAll(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('data') data?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.agendaService.findAll(usuario.tenantId, data, status);
   }
 
   @Get('pendentes')
-  findPendentes() {
-    return this.agendaService.findPendentes();
+  findPendentes(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.agendaService.findPendentes(usuario.tenantId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.agendaService.findOne(id);
+  findOne(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.agendaService.findOne(usuario.tenantId, id);
   }
 
   @Post()
-  create(@Body() dto: CreateAgendamentoDto) {
-    return this.agendaService.create(dto);
+  create(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreateAgendamentoDto,
+  ) {
+    return this.agendaService.create(usuario.tenantId, dto);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateAgendamentoDto) {
-    return this.agendaService.update(id, dto);
+  update(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateAgendamentoDto,
+  ) {
+    return this.agendaService.update(usuario.tenantId, id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.agendaService.remove(id);
+  remove(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.agendaService.remove(usuario.tenantId, id);
   }
 }

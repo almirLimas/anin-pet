@@ -19,6 +19,7 @@ export class AuthService {
   async login(dto: LoginDto) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { email: dto.email },
+      include: { tenant: { select: { id: true, nome: true, plano: true } } },
     });
 
     if (!usuario) throw new UnauthorizedException('Credenciais inválidas');
@@ -33,6 +34,7 @@ export class AuthService {
       sub: usuario.id,
       email: usuario.email,
       perfil: usuario.perfil,
+      tenantId: usuario.tenantId,
     });
 
     return {
@@ -42,6 +44,9 @@ export class AuthService {
         nomeCompleto: usuario.nomeCompleto,
         email: usuario.email,
         perfil: usuario.perfil,
+        tenantId: usuario.tenantId,
+        nomePetshop: usuario.tenant.nome,
+        plano: usuario.tenant.plano,
       },
     };
   }
@@ -55,23 +60,37 @@ export class AuthService {
 
     const senhaHash = await bcrypt.hash(dto.senha, 10);
 
-    const usuario = await this.prisma.usuario.create({
-      data: {
-        nomeCompleto: dto.nomeCompleto,
-        email: dto.email,
-        telefone: dto.telefone,
-        senhaHash,
-        perfil: dto.perfil ?? 'admin',
-        plano: dto.plano ?? 'basico',
-      },
+    // Cria o tenant (petshop) e o usuário admin em uma transação
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.create({
+        data: {
+          nome: dto.nomePetshop,
+          plano: dto.plano ?? 'basico',
+        },
+      });
+
+      const usuario = await tx.usuario.create({
+        data: {
+          nomeCompleto: dto.nomeCompleto,
+          email: dto.email,
+          telefone: dto.telefone,
+          senhaHash,
+          perfil: dto.perfil ?? 'admin',
+          tenantId: tenant.id,
+        },
+      });
+
+      return { usuario, tenant };
     });
 
     return {
-      id: usuario.id,
-      nomeCompleto: usuario.nomeCompleto,
-      email: usuario.email,
-      perfil: usuario.perfil,
-      plano: usuario.plano,
+      id: resultado.usuario.id,
+      nomeCompleto: resultado.usuario.nomeCompleto,
+      email: resultado.usuario.email,
+      perfil: resultado.usuario.perfil,
+      tenantId: resultado.tenant.id,
+      nomePetshop: resultado.tenant.nome,
+      plano: resultado.tenant.plano,
     };
   }
 
@@ -85,12 +104,18 @@ export class AuthService {
         telefone: true,
         perfil: true,
         status: true,
+        tenantId: true,
         createdAt: true,
+        tenant: { select: { nome: true, plano: true } },
       },
     });
 
     if (!usuario) throw new UnauthorizedException();
 
-    return usuario;
+    return {
+      ...usuario,
+      nomePetshop: usuario.tenant.nome,
+      plano: usuario.tenant.plano,
+    };
   }
 }

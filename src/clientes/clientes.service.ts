@@ -11,10 +11,11 @@ import { UpdateClienteDto } from './dto/update-cliente.dto';
 export class ClientesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(page = 1, limit = 20, busca?: string) {
+  async findAll(tenantId: string, page = 1, limit = 20, busca?: string) {
     const skip = (page - 1) * limit;
     const where = busca
       ? {
+          tenantId,
           OR: [
             { nome: { contains: busca, mode: 'insensitive' as const } },
             { cpf: { contains: busca } },
@@ -22,7 +23,7 @@ export class ClientesService {
             { email: { contains: busca, mode: 'insensitive' as const } },
           ],
         }
-      : {};
+      : { tenantId };
 
     const [data, total] = await Promise.all([
       this.prisma.cliente.findMany({
@@ -38,9 +39,9 @@ export class ClientesService {
     return { data, total, page, limit };
   }
 
-  async findOne(id: string) {
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id },
+  async findOne(tenantId: string, id: string) {
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id, tenantId },
       include: {
         pets: true,
         agendamentos: {
@@ -55,27 +56,27 @@ export class ClientesService {
     return cliente;
   }
 
-  async create(dto: CreateClienteDto) {
+  async create(tenantId: string, dto: CreateClienteDto) {
     const cpf = dto.cpf?.trim() || undefined;
 
     if (cpf) {
-      const existing = await this.prisma.cliente.findUnique({
-        where: { cpf },
+      const existing = await this.prisma.cliente.findFirst({
+        where: { tenantId, cpf },
       });
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
 
-    return this.prisma.cliente.create({ data: { ...dto, cpf } });
+    return this.prisma.cliente.create({ data: { ...dto, cpf, tenantId } });
   }
 
-  async update(id: string, dto: UpdateClienteDto) {
-    await this.findOne(id);
+  async update(tenantId: string, id: string, dto: UpdateClienteDto) {
+    await this.findOne(tenantId, id);
 
     const cpf = dto.cpf?.trim() || undefined;
 
     if (cpf) {
       const existing = await this.prisma.cliente.findFirst({
-        where: { cpf, NOT: { id } },
+        where: { tenantId, cpf, NOT: { id } },
       });
       if (existing)
         throw new ConflictException('CPF já cadastrado para outro cliente');
@@ -84,8 +85,8 @@ export class ClientesService {
     return this.prisma.cliente.update({ where: { id }, data: { ...dto, cpf } });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(tenantId: string, id: string) {
+    await this.findOne(tenantId, id);
     return this.prisma.cliente.delete({ where: { id } });
   }
 }

@@ -9,6 +9,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Perfil, Plano } from '@prisma/client';
 
 export class RegistrarDto {
+  @ApiProperty({ example: 'Petshop da Maria' })
+  @IsString({ message: 'O nome do petshop deve ser um texto' })
+  nomePetshop: string;
+
   @ApiProperty({ example: 'Ana Veterinaria' })
   @IsString({ message: 'O nome completo deve ser um texto' })
   nomeCompleto: string;
@@ -35,7 +39,7 @@ export class RegistrarDto {
   @ApiPropertyOptional({
     enum: Plano,
     default: 'basico',
-    description: 'Plano contratado pelo dono do negocio',
+    description: 'Plano contratado pelo negocio',
   })
   @IsOptional()
   @IsEnum(Plano, {

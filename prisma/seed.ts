@@ -30,14 +30,24 @@ async function main() {
 
   const senhaHash = await bcrypt.hash('admin123', 10);
 
+  const tenant = await prisma.tenant.upsert({
+    where: { id: 'default-tenant-0000000000' },
+    update: {},
+    create: {
+      id: 'default-tenant-0000000000',
+      nome: 'Petshop Demo',
+      plano: 'completo',
+    },
+  });
+
   await prisma.usuario.create({
     data: {
       nomeCompleto: 'Administrador',
       email,
       senhaHash,
       perfil: 'admin',
-      plano: 'completo',
       status: 'ativo',
+      tenantId: tenant.id,
     },
   });
 

@@ -7,12 +7,15 @@ import { TipoLancamento } from '@prisma/client';
 export class FinanceiroService {
   constructor(private readonly prisma: PrismaService) {}
 
-  listar(params: {
-    dataInicio?: string;
-    dataFim?: string;
-    tipo?: TipoLancamento;
-  }) {
-    const where: Record<string, unknown> = {};
+  listar(
+    tenantId: string,
+    params: {
+      dataInicio?: string;
+      dataFim?: string;
+      tipo?: TipoLancamento;
+    },
+  ) {
+    const where: Record<string, unknown> = { tenantId };
 
     if (params.dataInicio || params.dataFim) {
       where['data'] = {
@@ -44,7 +47,7 @@ export class FinanceiroService {
     });
   }
 
-  async resumoMes(ano: number, mes: number) {
+  async resumoMes(tenantId: string, ano: number, mes: number) {
     const inicio = new Date(
       `${ano}-${String(mes).padStart(2, '0')}-01T00:00:00.000Z`,
     );
@@ -54,7 +57,7 @@ export class FinanceiroService {
     );
 
     const lancamentos = await this.prisma.lancamento.findMany({
-      where: { data: { gte: inicio, lte: fim } },
+      where: { tenantId, data: { gte: inicio, lte: fim } },
       select: { tipo: true, valor: true },
     });
 
@@ -74,7 +77,7 @@ export class FinanceiroService {
     };
   }
 
-  criar(dto: CreateLancamentoDto) {
+  criar(dto: CreateLancamentoDto, tenantId: string) {
     return this.prisma.lancamento.create({
       data: {
         tipo: dto.tipo,
@@ -83,20 +86,25 @@ export class FinanceiroService {
         categoria: dto.categoria ?? 'Outro',
         data: dto.data ? new Date(`${dto.data}T12:00:00.000Z`) : new Date(),
         agendamentoId: dto.agendamentoId ?? null,
+        tenantId,
       },
     });
   }
 
-  async buscarUm(id: string) {
-    const lancamento = await this.prisma.lancamento.findUnique({
-      where: { id },
+  async buscarUm(tenantId: string, id: string) {
+    const lancamento = await this.prisma.lancamento.findFirst({
+      where: { id, tenantId },
     });
     if (!lancamento) throw new NotFoundException('Lançamento não encontrado');
     return lancamento;
   }
 
-  async atualizar(id: string, dto: Partial<CreateLancamentoDto>) {
-    await this.buscarUm(id);
+  async atualizar(
+    tenantId: string,
+    id: string,
+    dto: Partial<CreateLancamentoDto>,
+  ) {
+    await this.buscarUm(tenantId, id);
     return this.prisma.lancamento.update({
       where: { id },
       data: {
@@ -107,8 +115,8 @@ export class FinanceiroService {
     });
   }
 
-  async remover(id: string) {
-    await this.buscarUm(id);
+  async remover(tenantId: string, id: string) {
+    await this.buscarUm(tenantId, id);
     return this.prisma.lancamento.delete({ where: { id } });
   }
 }
