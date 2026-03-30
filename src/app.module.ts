@@ -10,6 +10,8 @@ import { AgendaModule } from './agenda/agenda.module';
 import { EstoqueModule } from './estoque/estoque.module';
 import { VacinasModule } from './vacinas/vacinas.module';
 import { FinanceiroModule } from './financeiro/financeiro.module';
+import { RelatoriosModule } from './relatorios/relatorios.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { FinanceiroModule } from './financeiro/financeiro.module';
     EstoqueModule,
     VacinasModule,
     FinanceiroModule,
+    RelatoriosModule,
+    WhatsappModule,
   ],
 })
 export class AppModule {}

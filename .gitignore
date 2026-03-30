@@ -5,3 +5,6 @@ node_modules
 /generated/prisma
 dist/
 .pnpm/
+
+# WhatsApp Baileys sessions
+.whatsapp-session/
