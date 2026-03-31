@@ -12,6 +12,7 @@ import { VacinasModule } from './vacinas/vacinas.module';
 import { FinanceiroModule } from './financeiro/financeiro.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { PagamentoModule } from './pagamento/pagamento.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     FinanceiroModule,
     RelatoriosModule,
     WhatsappModule,
+    PagamentoModule,
   ],
 })
 export class AppModule {}

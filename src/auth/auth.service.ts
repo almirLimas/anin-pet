@@ -62,10 +62,13 @@ export class AuthService {
 
     // Cria o tenant (petshop) e o usuário admin em uma transação
     const resultado = await this.prisma.$transaction(async (tx) => {
+      const trialExpiraEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
       const tenant = await tx.tenant.create({
         data: {
           nome: dto.nomePetshop,
           plano: dto.plano ?? 'basico',
+          trialExpiraEm,
         },
       });
 
@@ -83,7 +86,15 @@ export class AuthService {
       return { usuario, tenant };
     });
 
+    const token = this.jwt.sign({
+      sub: resultado.usuario.id,
+      email: resultado.usuario.email,
+      perfil: resultado.usuario.perfil,
+      tenantId: resultado.tenant.id,
+    });
+
     return {
+      access_token: token,
       id: resultado.usuario.id,
       nomeCompleto: resultado.usuario.nomeCompleto,
       email: resultado.usuario.email,
