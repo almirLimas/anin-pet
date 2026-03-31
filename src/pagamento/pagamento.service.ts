@@ -13,9 +13,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
 
 const PRECO_PLANO: Record<Plano, number> = {
-  basico: 89,
-  profissional: 139,
-  completo: 199,
+  basico: 79,
+  profissional: 129,
+  completo: 129,
 };
 
 const NOME_PLANO: Record<Plano, string> = {
