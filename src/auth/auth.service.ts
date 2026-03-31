@@ -6,6 +6,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegistrarDto } from './dto/registrar.dto';
 
@@ -19,7 +20,17 @@ export class AuthService {
   async login(dto: LoginDto) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { email: dto.email },
-      include: { tenant: { select: { id: true, nome: true, plano: true } } },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            nome: true,
+            plano: true,
+            assinaturaStatus: true,
+            trialExpiraEm: true,
+          },
+        },
+      },
     });
 
     if (!usuario) throw new UnauthorizedException('Credenciais inválidas');
@@ -29,6 +40,27 @@ export class AuthService {
 
     if (usuario.status === 'inativo')
       throw new UnauthorizedException('Usuário inativo');
+
+    const { assinaturaStatus, trialExpiraEm } = usuario.tenant;
+
+    if (assinaturaStatus === 'suspensa')
+      throw new UnauthorizedException(
+        'Assinatura suspensa. Regularize o pagamento para continuar.',
+      );
+
+    if (assinaturaStatus === 'cancelada')
+      throw new UnauthorizedException(
+        'Assinatura cancelada. Entre em contato com o suporte.',
+      );
+
+    if (
+      assinaturaStatus === 'trial' &&
+      trialExpiraEm &&
+      trialExpiraEm < new Date()
+    )
+      throw new UnauthorizedException(
+        'Período de teste encerrado. Assine um plano para continuar.',
+      );
 
     const token = this.jwt.sign({
       sub: usuario.id,
@@ -47,6 +79,8 @@ export class AuthService {
         tenantId: usuario.tenantId,
         nomePetshop: usuario.tenant.nome,
         plano: usuario.tenant.plano,
+        assinaturaStatus: usuario.tenant.assinaturaStatus,
+        trialExpiraEm: usuario.tenant.trialExpiraEm,
       },
     };
   }
@@ -103,6 +137,44 @@ export class AuthService {
       nomePetshop: resultado.tenant.nome,
       plano: resultado.tenant.plano,
     };
+  }
+
+  async atualizarPerfil(usuarioId: string, dto: AtualizarPerfilDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+    });
+
+    if (!usuario) throw new UnauthorizedException();
+
+    if (dto.novaSenha) {
+      if (!dto.senhaAtual)
+        throw new UnauthorizedException('Informe a senha atual para alterá-la');
+      const senhaValida = await bcrypt.compare(
+        dto.senhaAtual,
+        usuario.senhaHash,
+      );
+      if (!senhaValida)
+        throw new UnauthorizedException('Senha atual incorreta');
+    }
+
+    const data: Record<string, unknown> = {};
+    if (dto.nomeCompleto) data.nomeCompleto = dto.nomeCompleto;
+    if (dto.telefone) data.telefone = dto.telefone;
+    if (dto.novaSenha) data.senhaHash = await bcrypt.hash(dto.novaSenha, 10);
+
+    const atualizado = await this.prisma.usuario.update({
+      where: { id: usuarioId },
+      data,
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+        telefone: true,
+        perfil: true,
+      },
+    });
+
+    return atualizado;
   }
 
   async perfil(usuarioId: string) {
