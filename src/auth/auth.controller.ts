@@ -10,7 +10,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
+import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarDto } from './dto/registrar.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
@@ -50,5 +52,19 @@ export class AuthController {
     @Body() dto: AtualizarPerfilDto,
   ) {
     return this.authService.atualizarPerfil(req.user.id, dto);
+  }
+
+  @Post('esqueceu-senha')
+  @ApiOperation({ summary: 'Solicita link de redefinição de senha por e-mail' })
+  solicitarReset(@Body() dto: EsqueceuSenhaDto) {
+    return this.authService.solicitarResetSenha(dto);
+  }
+
+  @Post('redefinir-senha')
+  @ApiOperation({
+    summary: 'Redefine a senha usando o token recebido por e-mail',
+  })
+  redefinirSenha(@Body() dto: RedefinirSenhaDto) {
+    return this.authService.redefinirSenha(dto);
   }
 }

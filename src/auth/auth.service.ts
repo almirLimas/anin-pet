@@ -1,20 +1,28 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
+import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarDto } from './dto/registrar.dto';
+import { EmailService } from './email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly email: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -200,5 +208,58 @@ export class AuthService {
       nomePetshop: usuario.tenant.nome,
       plano: usuario.tenant.plano,
     };
+  }
+
+  async solicitarResetSenha(dto: EsqueceuSenhaDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { email: dto.email },
+    });
+
+    // Retorna sempre a mesma resposta para não revelar se o e-mail existe
+    if (!usuario)
+      return { mensagem: 'Se o e-mail existir, enviaremos o link.' };
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiraEm = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: { resetToken: token, resetTokenExpiraEm: expiraEm },
+    });
+
+    const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
+    const link = `${frontendUrl}/redefinir-senha?token=${token}`;
+
+    await this.email.enviarResetSenha(
+      usuario.email,
+      usuario.nomeCompleto,
+      link,
+    );
+
+    return { mensagem: 'Se o e-mail existir, enviaremos o link.' };
+  }
+
+  async redefinirSenha(dto: RedefinirSenhaDto) {
+    const usuario = await this.prisma.usuario.findFirst({
+      where: {
+        resetToken: dto.token,
+        resetTokenExpiraEm: { gt: new Date() },
+      },
+    });
+
+    if (!usuario) throw new BadRequestException('Token inválido ou expirado.');
+
+    const senhaHash = await bcrypt.hash(dto.novaSenha, 10);
+
+    await this.prisma.usuario.update({
+      where: { id: usuario.id },
+      data: {
+        senhaHash,
+        resetToken: null,
+        resetTokenExpiraEm: null,
+      },
+    });
+
+    return { mensagem: 'Senha redefinida com sucesso.' };
   }
 }

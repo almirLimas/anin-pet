@@ -64,16 +64,18 @@ model Tenant {
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
 
 model Usuario {
-  id           String        @id @default(cuid())
-  nomeCompleto String
-  email        String        @unique
-  telefone     String?
-  senhaHash    String
-  perfil       Perfil        @default(admin)
-  status       StatusUsuario @default(ativo)
-  tenantId     String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  nomeCompleto       String
+  email              String        @unique
+  telefone           String?
+  senhaHash          String
+  perfil             Perfil        @default(admin)
+  status             StatusUsuario @default(ativo)
+  tenantId           String
+  resetToken         String?
+  resetTokenExpiraEm DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 }
