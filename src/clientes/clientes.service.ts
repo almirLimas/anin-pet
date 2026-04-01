@@ -66,7 +66,28 @@ export class ClientesService {
       if (existing) throw new ConflictException('CPF já cadastrado');
     }
 
-    return this.prisma.cliente.create({ data: { ...dto, cpf, tenantId } });
+    const { pets, ...clienteData } = dto;
+
+    return this.prisma.$transaction(async (tx) => {
+      const cliente = await tx.cliente.create({
+        data: { ...clienteData, cpf, tenantId },
+      });
+
+      if (pets && pets.length > 0) {
+        await tx.pet.createMany({
+          data: pets.map((pet) => ({
+            ...pet,
+            clienteId: cliente.id,
+            tenantId,
+          })),
+        });
+      }
+
+      return tx.cliente.findFirst({
+        where: { id: cliente.id },
+        include: { pets: true },
+      });
+    });
   }
 
   async update(tenantId: string, id: string, dto: UpdateClienteDto) {
@@ -82,7 +103,11 @@ export class ClientesService {
         throw new ConflictException('CPF já cadastrado para outro cliente');
     }
 
-    return this.prisma.cliente.update({ where: { id }, data: { ...dto, cpf } });
+    return this.prisma.cliente.update({
+      where: { id },
+      data: { ...dto, cpf, pets: undefined },
+      include: { pets: true },
+    });
   }
 
   async remove(tenantId: string, id: string) {

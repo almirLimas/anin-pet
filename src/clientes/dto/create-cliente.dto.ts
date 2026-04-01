@@ -1,14 +1,66 @@
-import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
-import { Transform } from 'class-transformer';
+import {
+  IsArray,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  IsString,
+  Matches,
+  ValidateNested,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { StatusCliente } from '@prisma/client';
 
 const toOptionalString = ({ value }: { value: unknown }) =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
 
+export class PetEmbutidoDto {
+  @IsString()
+  nome: string;
+
+  @IsString()
+  especie: string;
+
+  @IsOptional()
+  @IsString()
+  raca?: string;
+
+  @IsOptional()
+  @IsEnum(['Macho', 'Fêmea'])
+  sexo?: 'Macho' | 'Fêmea';
+
+  @IsOptional()
+  @IsString()
+  dataNascimento?: string;
+
+  @IsOptional()
+  @IsString()
+  cor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value !== null && value !== undefined && value !== ''
+      ? String(value)
+      : undefined,
+  )
+  @IsString()
+  peso?: string;
+
+  @IsOptional()
+  @IsString()
+  porte?: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+}
+
 export class CreateClienteDto {
   @ApiProperty()
   @IsString()
+  @Matches(/^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$/, {
+    message: 'Nome não pode conter números ou caracteres especiais',
+  })
   nome: string;
 
   @ApiPropertyOptional()
@@ -97,4 +149,11 @@ export class CreateClienteDto {
   @IsOptional()
   @IsEnum(StatusCliente)
   status?: StatusCliente;
+
+  @ApiPropertyOptional({ type: [PetEmbutidoDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PetEmbutidoDto)
+  pets?: PetEmbutidoDto[];
 }

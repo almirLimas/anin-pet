@@ -11,10 +11,13 @@ export class EmailService {
   constructor(private readonly config: ConfigService) {
     this.remetente = config.getOrThrow<string>('EMAIL_FROM');
 
+    const secure = config.get<boolean>('EMAIL_SECURE', false);
+
     this.transporter = nodemailer.createTransport({
       host: config.getOrThrow<string>('EMAIL_HOST'),
       port: config.get<number>('EMAIL_PORT', 587),
-      secure: config.get<boolean>('EMAIL_SECURE', false),
+      secure,
+      requireTLS: !secure,
       auth: {
         user: config.getOrThrow<string>('EMAIL_USER'),
         pass: config.getOrThrow<string>('EMAIL_PASS'),
@@ -23,6 +26,13 @@ export class EmailService {
   }
 
   async enviarResetSenha(email: string, nome: string, link: string) {
+    const isDev = this.config.get<string>('NODE_ENV') !== 'production';
+
+    if (isDev) {
+      this.logger.warn(`[DEV] Link de redefinição para ${email}: ${link}`);
+      return; // Em dev, apenas loga o link — não tenta enviar e-mail
+    }
+
     try {
       await this.transporter.sendMail({
         from: `"AninPet" <${this.remetente}>`,
@@ -30,13 +40,13 @@ export class EmailService {
         subject: 'Redefinição de senha — AninPet',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-            <h2 style="color: #2563eb;">Redefinição de senha</h2>
+            <h2 style="color: #1d9fb6;">Redefinição de senha</h2>
             <p>Olá, <strong>${nome}</strong>!</p>
             <p>Recebemos uma solicitação para redefinir a senha da sua conta no AninPet.</p>
             <p>Clique no botão abaixo para criar uma nova senha. O link é válido por <strong>1 hora</strong>.</p>
             <div style="text-align: center; margin: 32px 0;">
               <a href="${link}"
-                 style="background:#2563eb;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:16px;">
+                 style="background:#1d9fb6;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:16px;">
                 Redefinir minha senha
               </a>
             </div>
@@ -50,6 +60,7 @@ export class EmailService {
       });
     } catch (err) {
       this.logger.error(`Falha ao enviar e-mail para ${email}`, err);
+      if (!isDev) throw err;
     }
   }
 }

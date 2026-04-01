@@ -1,4 +1,5 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePetDto {
@@ -36,6 +37,11 @@ export class CreatePetDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) =>
+    value !== null && value !== undefined && value !== ''
+      ? String(value)
+      : undefined,
+  )
   @IsString()
   peso?: string;
 
