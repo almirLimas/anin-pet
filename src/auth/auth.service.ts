@@ -49,25 +49,11 @@ export class AuthService {
     if (usuario.status === 'inativo')
       throw new UnauthorizedException('Usuário inativo');
 
-    const { assinaturaStatus, trialExpiraEm } = usuario.tenant;
-
-    if (assinaturaStatus === 'suspensa')
-      throw new UnauthorizedException(
-        'Assinatura suspensa. Regularize o pagamento para continuar.',
-      );
+    const { assinaturaStatus } = usuario.tenant;
 
     if (assinaturaStatus === 'cancelada')
       throw new UnauthorizedException(
         'Assinatura cancelada. Entre em contato com o suporte.',
-      );
-
-    if (
-      assinaturaStatus === 'trial' &&
-      trialExpiraEm &&
-      trialExpiraEm < new Date()
-    )
-      throw new UnauthorizedException(
-        'Período de teste encerrado. Assine um plano para continuar.',
       );
 
     const token = this.jwt.sign({
@@ -75,6 +61,7 @@ export class AuthService {
       email: usuario.email,
       perfil: usuario.perfil,
       tenantId: usuario.tenantId,
+      assinaturaStatus,
     });
 
     return {

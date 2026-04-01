@@ -43,7 +43,7 @@ export class RegistrarDto {
   })
   @IsOptional()
   @IsEnum(Plano, {
-    message: 'Plano invalido. Use basico, profissional ou completo',
+    message: 'Plano invalido. Use basico ou plus',
   })
   plano?: Plano;
 }

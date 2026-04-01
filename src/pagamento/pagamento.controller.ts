@@ -32,6 +32,12 @@ export class PagamentoController {
     );
   }
 
+  @Post('renovar')
+  @UseGuards(JwtAuthGuard)
+  renovar(@UsuarioAtual() usuario: JwtPayload) {
+    return this.pagamentoService.renovarAssinatura(usuario.tenantId);
+  }
+
   /** Endpoint público — chamado pelo Mercado Pago via webhook */
   @Post('webhook')
   @HttpCode(200)

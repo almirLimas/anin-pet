@@ -8,6 +8,7 @@ export interface JwtPayload {
   email: string;
   perfil: string;
   tenantId: string;
+  assinaturaStatus?: string;
 }
 
 @Injectable()
@@ -26,6 +27,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       perfil: payload.perfil,
       tenantId: payload.tenantId,
+      assinaturaStatus: payload.assinaturaStatus,
     };
   }
 }

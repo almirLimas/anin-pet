@@ -24,6 +24,7 @@ enum StatusUsuario {
 
 enum Plano {
   basico
+  plus
   profissional
   completo
 }

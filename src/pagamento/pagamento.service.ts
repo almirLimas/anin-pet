@@ -10,18 +10,21 @@ import { AssinaturaStatus, Plano } from '@prisma/client';
 import * as crypto from 'node:crypto';
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../auth/email.service';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
 
 const PRECO_PLANO: Record<Plano, number> = {
   basico: 79,
-  profissional: 129,
+  plus: 109,
+  profissional: 109,
   completo: 129,
 };
 
 const NOME_PLANO: Record<Plano, string> = {
   basico: 'Petshop Básico',
-  profissional: 'Petshop + Estoque',
-  completo: 'Completo',
+  plus: 'Petshop Plus',
+  profissional: 'Petshop Plus',
+  completo: 'Petshop Plus',
 };
 
 @Injectable()
@@ -32,13 +35,12 @@ export class PagamentoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   private get mpClient(): MercadoPagoConfig {
     const accessToken = this.config.getOrThrow<string>('MP_ACCESS_TOKEN');
-    if (!this._mpClient) {
-      this._mpClient = new MercadoPagoConfig({ accessToken });
-    }
+    this._mpClient ??= new MercadoPagoConfig({ accessToken });
     return this._mpClient;
   }
 
@@ -69,6 +71,36 @@ export class PagamentoService {
   }
 
   private async criarAssinatura(plano: Plano, tenantId: string) {
+    const trialExpiraEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        plano,
+        assinaturaStatus: AssinaturaStatus.trial,
+        trialExpiraEm,
+      },
+    });
+
+    return { tipo: 'trial' as const, trialExpiraEm };
+  }
+
+  async renovarAssinatura(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { plano: true, assinaturaStatus: true },
+    });
+
+    if (tenant.assinaturaStatus === 'ativa') {
+      throw new UnprocessableEntityException(
+        'Este tenant já possui uma assinatura ativa',
+      );
+    }
+
+    return this.criarPreferencePagamento(tenant.plano, tenantId);
+  }
+
+  private async criarPreferencePagamento(plano: Plano, tenantId: string) {
     const preco = PRECO_PLANO[plano];
     const nome = NOME_PLANO[plano];
     const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
@@ -88,9 +120,9 @@ export class PagamentoService {
           ],
           external_reference: tenantId,
           back_urls: {
-            success: `${frontendUrl}/criar-conta/sucesso`,
-            failure: `${frontendUrl}/criar-conta/pagamento-falhou`,
-            pending: `${frontendUrl}/criar-conta/sucesso`,
+            success: `${frontendUrl}/renovar-assinatura/sucesso`,
+            failure: `${frontendUrl}/renovar-assinatura/falhou`,
+            pending: `${frontendUrl}/renovar-assinatura/sucesso`,
           },
         },
       });
@@ -235,12 +267,20 @@ export class PagamentoService {
         ? AssinaturaStatus.ativa
         : AssinaturaStatus.suspensa;
 
+    const orderId = result.order?.id ? String(result.order.id) : null;
+
     await this.prisma.tenant.updateMany({
-      where: { mpPagamentoId: paymentId },
+      where: {
+        id: tenantId,
+        OR: [
+          { mpPagamentoId: paymentId },
+          ...(orderId ? [{ mpAssinaturaId: orderId }] : []),
+        ],
+      },
       data: { assinaturaStatus: status },
     });
 
-    this.logger.log(`Pagamento PIX ${paymentId}: ${status}`);
+    this.logger.log(`Pagamento ${paymentId}: ${status} (tenant ${tenantId})`);
   }
 
   async obterStatus(tenantId: string) {
