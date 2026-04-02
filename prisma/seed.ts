@@ -21,24 +21,29 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   const email = 'admin@aninpet.com';
 
+  // Sempre garante que o tenant master está com plano plus e ativa
+  const tenant = await prisma.tenant.upsert({
+    where: { id: 'default-tenant-0000000000' },
+    update: {
+      plano: 'plus',
+      assinaturaStatus: 'ativa',
+    },
+    create: {
+      id: 'default-tenant-0000000000',
+      nome: 'Anin Pet (Master)',
+      plano: 'plus',
+      assinaturaStatus: 'ativa',
+    },
+  });
+
   const existe = await prisma.usuario.findUnique({ where: { email } });
 
   if (existe) {
-    console.log('✅ Usuário admin já existe, pulando seeds.');
+    console.log('✅ Usuário admin já existe, tenant atualizado.');
     return;
   }
 
   const senhaHash = await bcrypt.hash('admin123', 10);
-
-  const tenant = await prisma.tenant.upsert({
-    where: { id: 'default-tenant-0000000000' },
-    update: {},
-    create: {
-      id: 'default-tenant-0000000000',
-      nome: 'Petshop Demo',
-      plano: 'completo',
-    },
-  });
 
   await prisma.usuario.create({
     data: {

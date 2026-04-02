@@ -51,11 +51,6 @@ export class AuthService {
 
     const { assinaturaStatus } = usuario.tenant;
 
-    if (assinaturaStatus === 'cancelada')
-      throw new UnauthorizedException(
-        'Assinatura cancelada. Entre em contato com o suporte.',
-      );
-
     const token = this.jwt.sign({
       sub: usuario.id,
       email: usuario.email,
@@ -184,7 +179,14 @@ export class AuthService {
         status: true,
         tenantId: true,
         createdAt: true,
-        tenant: { select: { nome: true, plano: true } },
+        tenant: {
+          select: {
+            nome: true,
+            plano: true,
+            assinaturaStatus: true,
+            trialExpiraEm: true,
+          },
+        },
       },
     });
 
@@ -194,6 +196,8 @@ export class AuthService {
       ...usuario,
       nomePetshop: usuario.tenant.nome,
       plano: usuario.tenant.plano,
+      assinaturaStatus: usuario.tenant.assinaturaStatus,
+      trialExpiraEm: usuario.tenant.trialExpiraEm,
     };
   }
 

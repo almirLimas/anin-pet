@@ -85,6 +85,32 @@ export class PagamentoService {
     return { tipo: 'trial' as const, trialExpiraEm };
   }
 
+  async trocarPlano(tenantId: string, plano: Plano) {
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { plano },
+    });
+    return { plano };
+  }
+
+  async cancelarAssinatura(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { assinaturaStatus: true },
+    });
+
+    if (tenant.assinaturaStatus === 'cancelada') {
+      throw new UnprocessableEntityException('Assinatura já está cancelada');
+    }
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { assinaturaStatus: AssinaturaStatus.cancelada },
+    });
+
+    return { cancelada: true };
+  }
+
   async renovarAssinatura(tenantId: string, plano?: Plano) {
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: tenantId },

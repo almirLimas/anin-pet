@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -53,5 +55,20 @@ export class PagamentoController {
   @UseGuards(JwtAuthGuard)
   status(@UsuarioAtual() usuario: JwtPayload) {
     return this.pagamentoService.obterStatus(usuario.tenantId);
+  }
+
+  @Delete('cancelar')
+  @UseGuards(JwtAuthGuard)
+  cancelar(@UsuarioAtual() usuario: JwtPayload) {
+    return this.pagamentoService.cancelarAssinatura(usuario.tenantId);
+  }
+
+  @Patch('plano')
+  @UseGuards(JwtAuthGuard)
+  trocarPlano(
+    @Body() dto: RenovarAssinaturaDto,
+    @UsuarioAtual() usuario: JwtPayload,
+  ) {
+    return this.pagamentoService.trocarPlano(usuario.tenantId, dto.plano!);
   }
 }
