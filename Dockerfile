@@ -12,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 RUN pnpm build
-RUN test -f /app/dist/main.js || (echo "ERROR: dist/main.js not found!" && ls -la /app/dist/ && exit 1)
+RUN test -f /app/dist/src/main.js || (echo "ERROR: dist/src/main.js not found!" && ls -la /app/dist/ && exit 1)
 
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
