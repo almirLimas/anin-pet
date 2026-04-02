@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:22-slim
 
 RUN npm install -g pnpm
 
@@ -11,7 +11,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN pnpm build && ls -la /app/dist/
+RUN pnpm build
+RUN test -f /app/dist/main.js || (echo "ERROR: dist/main.js not found!" && ls -la /app/dist/ && exit 1)
 
 COPY docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
