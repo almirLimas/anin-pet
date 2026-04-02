@@ -11,8 +11,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN pnpm build
+RUN pnpm build && ls -la /app/dist/
 
 EXPOSE 3001
 
-CMD ["node", "dist/main"]
+CMD ["node", "/app/dist/main"]
