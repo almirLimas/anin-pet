@@ -100,4 +100,61 @@ export class EmailService {
       this.logger.error(`Falha ao enviar e-mail de trial para ${email}`, err);
     }
   }
+
+  async enviarTrialExpirando(
+    email: string,
+    nome: string,
+    link: string,
+    diasRestantes: number,
+  ) {
+    const isDev = this.config.get<string>('NODE_ENV') !== 'production';
+
+    if (isDev) {
+      this.logger.warn(
+        `[DEV] Aviso trial expirando em ${diasRestantes}d para ${email}: ${link}`,
+      );
+      return;
+    }
+
+    const urgente = diasRestantes === 1;
+    const subject = urgente
+      ? 'Seu teste gratuito acaba amanhã — AninPet'
+      : `Seu teste gratuito expira em ${diasRestantes} dias — AninPet`;
+
+    const corBotao = urgente ? '#ef4444' : '#f07030';
+    const mensagem = urgente
+      ? 'Seu período de teste gratuito <strong>termina amanhã</strong>. Não perca o acesso ao seu sistema — ative sua assinatura agora!'
+      : `Faltam apenas <strong>${diasRestantes} dias</strong> para o fim do seu período de teste gratuito. Garanta já sua assinatura para continuar organizando seu petshop sem interrupções.`;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"AninPet" <${this.remetente}>`,
+        to: email,
+        subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #1d9fb6;">Seu teste está chegando ao fim 🐾</h2>
+            <p>Olá, <strong>${nome}</strong>!</p>
+            <p>${mensagem}</p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${link}"
+                 style="background:${corBotao};color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:16px;">
+                Ativar minha assinatura
+              </a>
+            </div>
+            <p style="color:#6b7280;font-size:13px;">
+              Após o pagamento, seu acesso continua normalmente sem nenhuma interrupção.
+            </p>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+            <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+          </div>
+        `,
+      });
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enviar aviso de trial expirando para ${email}`,
+        err,
+      );
+    }
+  }
 }

@@ -85,7 +85,7 @@ export class PagamentoService {
     return { tipo: 'trial' as const, trialExpiraEm };
   }
 
-  async renovarAssinatura(tenantId: string) {
+  async renovarAssinatura(tenantId: string, plano?: Plano) {
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: tenantId },
       select: { plano: true, assinaturaStatus: true },
@@ -97,7 +97,16 @@ export class PagamentoService {
       );
     }
 
-    return this.criarPreferencePagamento(tenant.plano, tenantId);
+    const planoEfetivo = plano ?? tenant.plano;
+
+    if (planoEfetivo !== tenant.plano) {
+      await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: { plano: planoEfetivo },
+      });
+    }
+
+    return this.criarPreferencePagamento(planoEfetivo, tenantId);
   }
 
   private async criarPreferencePagamento(plano: Plano, tenantId: string) {

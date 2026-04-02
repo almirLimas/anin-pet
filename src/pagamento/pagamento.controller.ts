@@ -12,6 +12,7 @@ import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
+import { RenovarAssinaturaDto } from './dto/renovar-assinatura.dto';
 import { PagamentoService } from './pagamento.service';
 
 @ApiTags('pagamento')
@@ -34,8 +35,11 @@ export class PagamentoController {
 
   @Post('renovar')
   @UseGuards(JwtAuthGuard)
-  renovar(@UsuarioAtual() usuario: JwtPayload) {
-    return this.pagamentoService.renovarAssinatura(usuario.tenantId);
+  renovar(
+    @Body() dto: RenovarAssinaturaDto,
+    @UsuarioAtual() usuario: JwtPayload,
+  ) {
+    return this.pagamentoService.renovarAssinatura(usuario.tenantId, dto.plano);
   }
 
   /** Endpoint público — chamado pelo Mercado Pago via webhook */

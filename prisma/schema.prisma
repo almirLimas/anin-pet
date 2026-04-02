@@ -44,8 +44,10 @@ model Tenant {
   nome             String
   plano            Plano            @default(basico)
   status           StatusUsuario    @default(ativo)
-  assinaturaStatus AssinaturaStatus @default(trial)
-  trialExpiraEm    DateTime?
+  assinaturaStatus     AssinaturaStatus @default(trial)
+  trialExpiraEm        DateTime?
+  avisoTrial3dEnviadoEm DateTime?
+  avisoTrial1dEnviadoEm DateTime?
   mpAssinaturaId   String?
   mpPagamentoId    String?
   createdAt        DateTime         @default(now())
