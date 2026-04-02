@@ -117,6 +117,15 @@ export class AuthService {
       tenantId: resultado.tenant.id,
     });
 
+    // Notifica o admin sobre o novo cadastro (fire-and-forget)
+    this.email
+      .enviarNotificacaoNovoCadastro(
+        resultado.usuario.nomeCompleto,
+        resultado.usuario.email,
+        resultado.tenant.nome,
+      )
+      .catch(() => {});
+
     return {
       access_token: token,
       id: resultado.usuario.id,

@@ -157,4 +157,48 @@ export class EmailService {
       );
     }
   }
+
+  async enviarNotificacaoNovoCadastro(
+    nomeCliente: string,
+    emailCliente: string,
+    nomePetshop: string,
+  ) {
+    const adminEmail = this.config.get<string>('ADMIN_NOTIFICATION_EMAIL');
+    if (!adminEmail) return;
+
+    try {
+      await this.transporter.sendMail({
+        from: `"AninPet" <${this.remetente}>`,
+        to: adminEmail,
+        subject: '🐾 Novo cadastro no AninPet!',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2 style="color: #1d9fb6;">Novo cliente cadastrado! 🎉</h2>
+            <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+              <tr>
+                <td style="padding:8px 0;color:#6b7280;font-size:14px;width:140px;">Nome</td>
+                <td style="padding:8px 0;font-weight:bold;font-size:14px;">${nomeCliente}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#6b7280;font-size:14px;">E-mail</td>
+                <td style="padding:8px 0;font-size:14px;">${emailCliente}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#6b7280;font-size:14px;">Petshop</td>
+                <td style="padding:8px 0;font-size:14px;">${nomePetshop}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;color:#6b7280;font-size:14px;">Data</td>
+                <td style="padding:8px 0;font-size:14px;">${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
+              </tr>
+            </table>
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+            <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+          </div>
+        `,
+      });
+    } catch (err) {
+      this.logger.error('Falha ao enviar notificação de novo cadastro', err);
+    }
+  }
 }
