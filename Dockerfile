@@ -13,6 +13,9 @@ COPY . .
 
 RUN pnpm build && ls -la /app/dist/
 
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 EXPOSE 3001
 
-CMD ["node", "/app/dist/main"]
+CMD ["./docker-entrypoint.sh"]
