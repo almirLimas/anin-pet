@@ -85,7 +85,10 @@ export class AgendaService {
         `Até lá! 😊`;
 
       this.whatsapp
-        .enviar({ telefone, mensagem, nomeCliente: agendamento.cliente.nome }, tenantId)
+        .enviar(
+          { telefone, mensagem, nomeCliente: agendamento.cliente.nome },
+          tenantId,
+        )
         .catch((err: unknown) =>
           this.logger.error(`Falha ao notificar WhatsApp: ${String(err)}`),
         );
