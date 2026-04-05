@@ -65,9 +65,13 @@ export class AgendaService {
       include: this.include,
     });
 
-    // Notificação WhatsApp ao cliente
+    // Notificação WhatsApp ao cliente (somente plano Plus)
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { plano: true },
+    });
     const telefone = agendamento.cliente.telefonePrincipal;
-    if (telefone) {
+    if (telefone && tenant?.plano === 'plus') {
       const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
