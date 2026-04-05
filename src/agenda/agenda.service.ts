@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
 import { FinanceiroService } from '../financeiro/financeiro.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 
 @Injectable()
 export class AgendaService {
+  private readonly logger = new Logger(AgendaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly financeiro: FinanceiroService,
+    private readonly whatsapp: WhatsappService,
   ) {}
 
   private get include() {
@@ -52,7 +56,7 @@ export class AgendaService {
   }
 
   async create(tenantId: string, dto: CreateAgendamentoDto) {
-    return this.prisma.agendamento.create({
+    const agendamento = await this.prisma.agendamento.create({
       data: {
         ...dto,
         tenantId,
@@ -60,6 +64,34 @@ export class AgendaService {
       },
       include: this.include,
     });
+
+    // Notificação WhatsApp ao cliente
+    const telefone = agendamento.cliente.telefonePrincipal;
+    if (telefone) {
+      const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      const horaFormatada = agendamento.dataHora.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const mensagem =
+        `Olá, ${agendamento.cliente.nome}! 🐾 Seu agendamento foi confirmado.\n` +
+        `Pet: ${agendamento.pet.nome}\n` +
+        `Serviço: ${agendamento.servico.nome}\n` +
+        `Data: ${dataFormatada} às ${horaFormatada}\n` +
+        `Até lá! 😊`;
+
+      this.whatsapp
+        .enviar({ telefone, mensagem, nomeCliente: agendamento.cliente.nome }, tenantId)
+        .catch((err: unknown) =>
+          this.logger.error(`Falha ao notificar WhatsApp: ${String(err)}`),
+        );
+    }
+
+    return agendamento;
   }
 
   async update(tenantId: string, id: string, dto: UpdateAgendamentoDto) {
