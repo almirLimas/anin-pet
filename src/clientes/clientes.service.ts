@@ -31,7 +31,7 @@ export class ClientesService {
         skip,
         take: limit,
         orderBy: { nome: 'asc' },
-        include: { _count: { select: { pets: true } } },
+        include: { pets: true, _count: { select: { pets: true } } },
       }),
       this.prisma.cliente.count({ where }),
     ]);
