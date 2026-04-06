@@ -62,6 +62,7 @@ export class AgendaCronService {
 
       let enviados = 0;
       for (const cliente of clientes) {
+        if (!cliente.email) continue;
         const ultimoAgendamento = cliente.agendamentos[0];
         if (!ultimoAgendamento) continue;
 
