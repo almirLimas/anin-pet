@@ -10,6 +10,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -52,6 +53,17 @@ export class AuthController {
     @Body() dto: AtualizarPerfilDto,
   ) {
     return this.authService.atualizarPerfil(req.user.id, dto);
+  }
+
+  @Patch('meta')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Atualiza a meta mensal de receita do petshop' })
+  atualizarMeta(
+    @Request() req: { user: { id: string } },
+    @Body() dto: AtualizarMetaDto,
+  ) {
+    return this.authService.atualizarMeta(req.user.id, dto);
   }
 
   @Post('esqueceu-senha')

@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
+import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -194,6 +195,7 @@ export class AuthService {
             plano: true,
             assinaturaStatus: true,
             trialExpiraEm: true,
+            metaMensal: true,
           },
         },
       },
@@ -207,7 +209,25 @@ export class AuthService {
       plano: usuario.tenant.plano,
       assinaturaStatus: usuario.tenant.assinaturaStatus,
       trialExpiraEm: usuario.tenant.trialExpiraEm,
+      metaMensal: usuario.tenant.metaMensal
+        ? Number(usuario.tenant.metaMensal)
+        : null,
     };
+  }
+
+  async atualizarMeta(usuarioId: string, dto: AtualizarMetaDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { tenantId: true },
+    });
+    if (!usuario) throw new UnauthorizedException();
+
+    await this.prisma.tenant.update({
+      where: { id: usuario.tenantId },
+      data: { metaMensal: dto.metaMensal },
+    });
+
+    return { metaMensal: dto.metaMensal };
   }
 
   async solicitarResetSenha(dto: EsqueceuSenhaDto) {
