@@ -5,15 +5,27 @@ import { Resend } from 'resend';
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly resend: Resend;
+  private readonly resend: Resend | null;
   private readonly remetente: string;
 
   constructor(private readonly config: ConfigService) {
-    this.remetente = config.getOrThrow<string>('EMAIL_FROM');
-    this.resend = new Resend(config.getOrThrow<string>('RESEND_API_KEY'));
+    this.remetente = config.get<string>('EMAIL_FROM', 'noreply@aninpet.com.br');
+    const apiKey = config.get<string>('RESEND_API_KEY', '');
+    if (!apiKey) {
+      this.logger.warn(
+        'RESEND_API_KEY não configurada — e-mails não serão enviados.',
+      );
+      this.resend = null;
+    } else {
+      this.resend = new Resend(apiKey);
+    }
   }
 
   private async enviar(to: string, subject: string, html: string) {
+    if (!this.resend) {
+      this.logger.warn(`[EMAIL IGNORADO] Para: ${to} | Assunto: ${subject}`);
+      return;
+    }
     const { error } = await this.resend.emails.send({
       from: `AninPet <${this.remetente}>`,
       to,
