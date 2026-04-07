@@ -380,6 +380,7 @@ export class PagamentoService {
         assinaturaStatus: true,
         trialExpiraEm: true,
         plano: true,
+        mpAssinaturaId: true,
       },
     });
   }
