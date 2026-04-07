@@ -83,6 +83,16 @@ export class AuthService {
 
     if (existe) throw new ConflictException('E-mail já cadastrado');
 
+    // Valida dígitos verificadores do CPF
+    const cpfDigits = dto.cpf.replaceAll('.', '').replaceAll('-', '');
+    if (!this.validarCpf(cpfDigits))
+      throw new BadRequestException('CPF inválido');
+
+    const cpfExiste = await this.prisma.usuario.findUnique({
+      where: { cpf: dto.cpf },
+    });
+    if (cpfExiste) throw new ConflictException('CPF já cadastrado');
+
     const senhaHash = await bcrypt.hash(dto.senha, 10);
 
     // Cria o tenant (petshop) e o usuário admin em uma transação
@@ -101,6 +111,7 @@ export class AuthService {
         data: {
           nomeCompleto: dto.nomeCompleto,
           email: dto.email,
+          cpf: dto.cpf,
           telefone: dto.telefone,
           senhaHash,
           perfil: dto.perfil ?? 'admin',
@@ -281,5 +292,19 @@ export class AuthService {
     });
 
     return { mensagem: 'Senha redefinida com sucesso.' };
+  }
+
+  private validarCpf(digits: string): boolean {
+    if (digits.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(digits)) return false;
+
+    const calc = (end: number): number => {
+      let sum = 0;
+      for (let i = 0; i < end; i++) sum += Number(digits[i]) * (end + 1 - i);
+      const rem = (sum * 10) % 11;
+      return rem === 10 ? 0 : rem;
+    };
+
+    return calc(9) === Number(digits[9]) && calc(10) === Number(digits[10]);
   }
 }

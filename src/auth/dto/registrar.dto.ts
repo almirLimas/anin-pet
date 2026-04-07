@@ -3,6 +3,7 @@
   IsEnum,
   IsOptional,
   IsString,
+  Matches,
   MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -20,6 +21,13 @@ export class RegistrarDto {
   @ApiProperty({ example: 'ana@aninpet.com' })
   @IsEmail({}, { message: 'Informe um e-mail valido' })
   email: string;
+
+  @ApiProperty({ example: '123.456.789-09' })
+  @IsString({ message: 'O CPF deve ser um texto' })
+  @Matches(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/, {
+    message: 'CPF inválido. Use o formato 000.000.000-00',
+  })
+  cpf: string;
 
   @ApiPropertyOptional({ example: '(11) 99999-0000' })
   @IsOptional()

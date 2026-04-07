@@ -72,6 +72,7 @@ model Usuario {
   id                 String        @id @default(cuid())
   nomeCompleto       String
   email              String        @unique
+  cpf                String?       @unique
   telefone           String?
   senhaHash          String
   perfil             Perfil        @default(admin)

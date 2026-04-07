@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -8,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AssinaturaStatus, Plano } from '@prisma/client';
 import * as crypto from 'node:crypto';
-import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
+import { MercadoPagoConfig, Payment, PreApproval } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../auth/email.service';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
@@ -60,29 +59,7 @@ export class PagamentoService {
       );
     }
 
-    if (dto.formaPagamento === 'cartao') {
-      return this.criarAssinatura(dto.plano, tenantId);
-    }
-
-    if (!dto.cpf) {
-      throw new BadRequestException('CPF é obrigatório para pagamento via PIX');
-    }
-    return this.criarPix(dto.plano, tenantId, email, dto.cpf);
-  }
-
-  private async criarAssinatura(plano: Plano, tenantId: string) {
-    const trialExpiraEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
-
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        plano,
-        assinaturaStatus: AssinaturaStatus.trial,
-        trialExpiraEm,
-      },
-    });
-
-    return { tipo: 'trial' as const, trialExpiraEm };
+    return this.criarPreApproval(dto.plano, tenantId, email);
   }
 
   async trocarPlano(tenantId: string, plano: Plano) {
@@ -114,7 +91,11 @@ export class PagamentoService {
   async renovarAssinatura(tenantId: string, plano?: Plano) {
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: tenantId },
-      select: { plano: true, assinaturaStatus: true },
+      select: {
+        plano: true,
+        assinaturaStatus: true,
+        usuarios: { select: { email: true }, take: 1 },
+      },
     });
 
     if (tenant.assinaturaStatus === 'ativa') {
@@ -132,34 +113,41 @@ export class PagamentoService {
       });
     }
 
-    return this.criarPreferencePagamento(planoEfetivo, tenantId);
+    const email = tenant.usuarios[0]?.email ?? '';
+    return this.criarPreApproval(planoEfetivo, tenantId, email);
   }
 
-  private async criarPreferencePagamento(plano: Plano, tenantId: string) {
+  private async criarPreApproval(
+    plano: Plano,
+    tenantId: string,
+    email: string,
+  ) {
     const preco = PRECO_PLANO[plano];
     const nome = NOME_PLANO[plano];
-    const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
+    const frontendUrl = this.config
+      .getOrThrow<string>('FRONTEND_URL')
+      .split(',')[0]
+      .trim()
+      .replace(/\/$/, '');
+    const apiUrl = this.config.getOrThrow<string>('BASE_URL');
 
     try {
-      const preference = new Preference(this.mpClient);
-      const result = await preference.create({
+      const preApproval = new PreApproval(this.mpClient);
+      const result = await preApproval.create({
         body: {
-          items: [
-            {
-              id: `plano-${plano}`,
-              title: `${nome} - Anin Pet`,
-              quantity: 1,
-              unit_price: preco,
-              currency_id: 'BRL',
-            },
-          ],
+          reason: `${nome} - Anin Pet`,
           external_reference: tenantId,
-          back_urls: {
-            success: `${frontendUrl}/renovar-assinatura/sucesso`,
-            failure: `${frontendUrl}/renovar-assinatura/falhou`,
-            pending: `${frontendUrl}/renovar-assinatura/sucesso`,
+          payer_email: email,
+          auto_recurring: {
+            frequency: 1,
+            frequency_type: 'months',
+            transaction_amount: preco,
+            currency_id: 'BRL',
           },
-        },
+          back_url: `${frontendUrl}/renovar-assinatura/sucesso`,
+          notification_url: `${apiUrl}/pagamento/webhook`,
+          status: 'pending',
+        } as any,
       });
 
       await this.prisma.tenant.update({
@@ -172,7 +160,10 @@ export class PagamentoService {
 
       return { tipo: 'checkout' as const, url: result.init_point! };
     } catch (err) {
-      this.logger.error('Erro ao criar preferência no Mercado Pago', err);
+      this.logger.error(
+        'Erro ao criar assinatura recorrente no Mercado Pago',
+        err,
+      );
       throw new InternalServerErrorException(
         `Erro ao criar assinatura: ${
           err instanceof Error ? err.message : JSON.stringify(err)
@@ -259,6 +250,10 @@ export class PagamentoService {
     if (data.type === 'payment' && data.data?.id) {
       await this.processarPagamento(String(data.data.id));
     }
+
+    if (data.type === 'subscription_preapproval' && data.data?.id) {
+      await this.processarPreApproval(String(data.data.id));
+    }
   }
 
   private validarAssinatura(
@@ -316,6 +311,47 @@ export class PagamentoService {
     });
 
     this.logger.log(`Pagamento ${paymentId}: ${status} (tenant ${tenantId})`);
+  }
+
+  private async processarPreApproval(preApprovalId: string) {
+    try {
+      const preApproval = new PreApproval(this.mpClient);
+      const result = await preApproval.get({ id: preApprovalId });
+
+      const tenantId = result.external_reference;
+      if (!tenantId) return;
+
+      // authorized = assinante autorizou e 1ª cobrança foi aprovada
+      // cancelled / paused = cancelou ou suspenso
+      let status: AssinaturaStatus;
+      switch (result.status) {
+        case 'authorized':
+          status = AssinaturaStatus.ativa;
+          break;
+        case 'paused':
+          status = AssinaturaStatus.suspensa;
+          break;
+        case 'cancelled':
+          status = AssinaturaStatus.cancelada;
+          break;
+        default:
+          status = AssinaturaStatus.pendente;
+      }
+
+      await this.prisma.tenant.updateMany({
+        where: { id: tenantId },
+        data: {
+          assinaturaStatus: status,
+          mpAssinaturaId: preApprovalId,
+        },
+      });
+
+      this.logger.log(
+        `PreApproval ${preApprovalId}: ${result.status} → ${status} (tenant ${tenantId})`,
+      );
+    } catch (err) {
+      this.logger.error(`Erro ao processar PreApproval ${preApprovalId}`, err);
+    }
   }
 
   async obterStatus(tenantId: string) {
