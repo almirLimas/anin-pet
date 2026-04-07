@@ -11,6 +11,7 @@ import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
+import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -138,6 +139,15 @@ export class AuthService {
       )
       .catch(() => {});
 
+    // E-mail de boas-vindas com primeiros passos para o novo petshop (fire-and-forget)
+    this.email
+      .enviarBoasVindas(
+        resultado.usuario.email,
+        resultado.usuario.nomeCompleto,
+        resultado.tenant.nome,
+      )
+      .catch(() => {});
+
     return {
       access_token: token,
       id: resultado.usuario.id,
@@ -207,6 +217,7 @@ export class AuthService {
             assinaturaStatus: true,
             trialExpiraEm: true,
             metaMensal: true,
+            taxaBusca: true,
           },
         },
       },
@@ -222,6 +233,9 @@ export class AuthService {
       trialExpiraEm: usuario.tenant.trialExpiraEm,
       metaMensal: usuario.tenant.metaMensal
         ? Number(usuario.tenant.metaMensal)
+        : null,
+      taxaBusca: usuario.tenant.taxaBusca
+        ? Number(usuario.tenant.taxaBusca)
         : null,
     };
   }
@@ -239,6 +253,21 @@ export class AuthService {
     });
 
     return { metaMensal: dto.metaMensal };
+  }
+
+  async atualizarTaxaBusca(usuarioId: string, dto: AtualizarTaxaBuscaDto) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { tenantId: true },
+    });
+    if (!usuario) throw new UnauthorizedException();
+
+    await this.prisma.tenant.update({
+      where: { id: usuario.tenantId },
+      data: { taxaBusca: dto.taxaBusca },
+    });
+
+    return { taxaBusca: dto.taxaBusca };
   }
 
   async solicitarResetSenha(dto: EsqueceuSenhaDto) {

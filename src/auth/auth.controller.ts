@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
+import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -64,6 +65,17 @@ export class AuthController {
     @Body() dto: AtualizarMetaDto,
   ) {
     return this.authService.atualizarMeta(req.user.id, dto);
+  }
+
+  @Patch('taxa-busca')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Atualiza a taxa de busca/taxidog do petshop' })
+  atualizarTaxaBusca(
+    @Request() req: { user: { id: string } },
+    @Body() dto: AtualizarTaxaBuscaDto,
+  ) {
+    return this.authService.atualizarTaxaBusca(req.user.id, dto);
   }
 
   @Post('esqueceu-senha')

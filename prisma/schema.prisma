@@ -51,6 +51,7 @@ model Tenant {
   mpAssinaturaId   String?
   mpPagamentoId    String?
   metaMensal       Decimal?         @db.Decimal(10, 2)
+  taxaBusca        Decimal?         @db.Decimal(10, 2)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -209,6 +210,7 @@ model Agendamento {
   observacoes String?
   status      StatusAgendamento      @default(Agendado)
   modalidade  ModalidadeAgendamento  @default(ClienteTraz)
+  taxaBusca   Decimal?               @db.Decimal(10, 2)
   clienteId   String
   petId       String
   servicoId   String
@@ -269,7 +271,7 @@ model AvaliacaoCliente {
   createdAt     DateTime  @default(now())
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
-  agendamento Agendamento @relation(fields: [agendamentoId], references: [id])
+  agendamento Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
   cliente     Cliente     @relation(fields: [clienteId], references: [id])
 }
 

@@ -118,17 +118,33 @@ export class AgendaService {
       include: this.include,
     });
 
+    // Cancela lançamento financeiro se o agendamento for cancelado
+    if (dto.status === 'Cancelado') {
+      await this.prisma.lancamento.deleteMany({
+        where: { agendamentoId: id },
+      });
+    }
+
     // Auto-lançamento financeiro ao concluir
     if (dto.status === 'Concluido') {
       const jaExiste = await this.prisma.lancamento.findFirst({
         where: { agendamentoId: id },
       });
       if (!jaExiste) {
+        const taxaBusca = atualizado.taxaBusca
+          ? Number(atualizado.taxaBusca)
+          : 0;
+        const valorTotal = Number(atualizado.servico.preco) + taxaBusca;
+        const descricao =
+          taxaBusca > 0
+            ? `${atualizado.servico.nome} — ${atualizado.pet.nome} (+ taxa de busca)`
+            : `${atualizado.servico.nome} — ${atualizado.pet.nome}`;
+
         await this.financeiro.criar(
           {
             tipo: 'Receita',
-            valor: Number(atualizado.servico.preco),
-            descricao: `${atualizado.servico.nome} — ${atualizado.pet.nome}`,
+            valor: valorTotal,
+            descricao,
             categoria: 'Servico',
             agendamentoId: id,
           },

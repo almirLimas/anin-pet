@@ -50,6 +50,68 @@ export class EmailService {
     if (error) throw new Error(error.message);
   }
 
+  async enviarBoasVindas(email: string, nome: string, nomePetshop: string) {
+    try {
+      await this.enviar(
+        email,
+        `Bem-vindo ao AninPet, ${nomePetshop}! 🐾`,
+        `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
+          <h2 style="color: #1d9fb6;">Tudo pronto para começar! 🎉</h2>
+          <p>Olá, <strong>${nome}</strong>! Seu petshop <strong>${nomePetshop}</strong> está cadastrado no AninPet. Aqui estão os primeiros passos para configurar o sistema:</p>
+
+          <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+            <tr style="background:#f0fafb;">
+              <td style="padding:12px 16px;font-size:22px;width:48px;">1️⃣</td>
+              <td style="padding:12px 16px;">
+                <strong>Cadastre seus serviços</strong><br/>
+                <span style="color:#6b7280;font-size:13px;">Vá em <em>Serviços</em> e cadastre banho, tosa, consulta etc. com o preço e duração de cada um.</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;font-size:22px;">2️⃣</td>
+              <td style="padding:12px 16px;">
+                <strong>Configure a taxa de busca (taxidog)</strong><br/>
+                <span style="color:#6b7280;font-size:13px;">Se seu petshop faz transporte de pets, defina o valor fixo da taxa em <em>Configurações → Taxa de busca</em>. Esse valor será somado automaticamente nos agendamentos marcados como "Petshop Busca".</span>
+              </td>
+            </tr>
+            <tr style="background:#f0fafb;">
+              <td style="padding:12px 16px;font-size:22px;">3️⃣</td>
+              <td style="padding:12px 16px;">
+                <strong>Defina sua meta mensal</strong><br/>
+                <span style="color:#6b7280;font-size:13px;">Em <em>Configurações → Meta mensal</em>, informe quanto você quer faturar por mês. O painel vai mostrar seu progresso em tempo real.</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;font-size:22px;">4️⃣</td>
+              <td style="padding:12px 16px;">
+                <strong>Cadastre seus clientes e pets</strong><br/>
+                <span style="color:#6b7280;font-size:13px;">Adicione os clientes na seção <em>Clientes</em>. Você já pode incluir os pets deles no mesmo cadastro.</span>
+              </td>
+            </tr>
+            <tr style="background:#f0fafb;">
+              <td style="padding:12px 16px;font-size:22px;">5️⃣</td>
+              <td style="padding:12px 16px;">
+                <strong>Faça seu primeiro agendamento</strong><br/>
+                <span style="color:#6b7280;font-size:13px;">Na agenda, clique em <em>Novo agendamento</em>, escolha o cliente, o pet, o serviço e o horário. Pronto!</span>
+              </td>
+            </tr>
+          </table>
+
+          <p style="color:#6b7280;font-size:13px;">Você tem <strong>14 dias de teste gratuito</strong>. Aproveite para explorar todas as funcionalidades!</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enviar e-mail de boas-vindas para ${email}`,
+        err,
+      );
+    }
+  }
+
   async enviarResetSenha(email: string, nome: string, link: string) {
     try {
       await this.enviar(

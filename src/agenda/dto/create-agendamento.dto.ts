@@ -1,6 +1,7 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ModalidadeAgendamento, StatusAgendamento } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class CreateAgendamentoDto {
   @ApiProperty()
@@ -33,4 +34,13 @@ export class CreateAgendamentoDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({
+    description: 'Taxa de busca/transporte (taxidog) em reais',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  taxaBusca?: number;
 }
