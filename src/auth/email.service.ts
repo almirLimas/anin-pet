@@ -16,7 +16,16 @@ export class EmailService {
       this.config.get<string>('RESEND_API_KEY') ||
       process.env['RESEND_API_KEY'] ||
       '';
+
+    // Diagnóstico temporário — remover após confirmar funcionamento
+    const resendKeys = Object.keys(process.env).filter((k) =>
+      k.toUpperCase().includes('RESEND'),
+    );
+    this.logger.debug(
+      `[EmailService] Chaves com "RESEND" no process.env: [${resendKeys.join(', ')}]`,
+    );
     this.logger.debug(`[EmailService] RESEND_API_KEY presente: ${!!apiKey}`);
+
     if (!apiKey) {
       this.logger.warn(
         'RESEND_API_KEY não configurada — e-mails não serão enviados.',
