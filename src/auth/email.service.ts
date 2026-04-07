@@ -12,7 +12,11 @@ export class EmailService {
   }
 
   private getResend(): Resend | null {
-    const apiKey = this.config.get<string>('RESEND_API_KEY', '');
+    const apiKey =
+      this.config.get<string>('RESEND_API_KEY') ||
+      process.env['RESEND_API_KEY'] ||
+      '';
+    this.logger.debug(`[EmailService] RESEND_API_KEY presente: ${!!apiKey}`);
     if (!apiKey) {
       this.logger.warn(
         'RESEND_API_KEY não configurada — e-mails não serão enviados.',
