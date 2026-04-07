@@ -63,6 +63,7 @@ model Tenant {
   produtos      Produto[]
   movimentacoes Movimentacao[]
   vacinas       Vacina[]
+  avaliacoes    AvaliacaoCliente[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ model Cliente {
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   pets         Pet[]
   agendamentos Agendamento[]
+  avaliacoes   AvaliacaoCliente[]
 
   @@unique([tenantId, cpf])
   @@unique([tenantId, codigo])
@@ -218,6 +220,7 @@ model Agendamento {
   pet         Pet          @relation(fields: [petId], references: [id])
   servico     Servico      @relation(fields: [servicoId], references: [id])
   lancamentos Lancamento[]
+  avaliacao   AvaliacaoCliente?
 }
 
 // ── Financeiro ───────────────────────────────────────────────────────────────────────
@@ -250,6 +253,23 @@ model Lancamento {
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
+}
+
+// ── Avaliações de Satisfação ─────────────────────────────────────────────────
+
+model AvaliacaoCliente {
+  id            String    @id @default(cuid())
+  nota          Int       // 1 a 5
+  token         String    @unique
+  respondidaEm  DateTime?
+  agendamentoId String    @unique
+  clienteId     String
+  tenantId      String
+  createdAt     DateTime  @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  agendamento Agendamento @relation(fields: [agendamentoId], references: [id])
+  cliente     Cliente     @relation(fields: [clienteId], references: [id])
 }
 
 // ── Estoque ──────────────────────────────────────────────────────────────────

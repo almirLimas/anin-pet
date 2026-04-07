@@ -13,6 +13,7 @@ import { FinanceiroModule } from './financeiro/financeiro.module';
 import { RelatoriosModule } from './relatorios/relatorios.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { PagamentoModule } from './pagamento/pagamento.module';
+import { AvaliacoesModule } from './avaliacoes/avaliacoes.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { PagamentoModule } from './pagamento/pagamento.module';
     RelatoriosModule,
     WhatsappModule,
     PagamentoModule,
+    AvaliacoesModule,
   ],
 })
 export class AppModule {}

@@ -1,10 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
 import { FinanceiroService } from '../financeiro/financeiro.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
+import { AvaliacoesService } from '../avaliacoes/avaliacoes.service';
+import { EmailService } from '../auth/email.service';
 
 @Injectable()
 export class AgendaService {
@@ -14,6 +17,9 @@ export class AgendaService {
     private readonly prisma: PrismaService,
     private readonly financeiro: FinanceiroService,
     private readonly whatsapp: WhatsappService,
+    private readonly avaliacoes: AvaliacoesService,
+    private readonly email: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   private get include() {
@@ -128,6 +134,47 @@ export class AgendaService {
           },
           tenantId,
         );
+      }
+
+      // Dispara pesquisa de satisfação por e-mail (se cliente tiver e-mail)
+      const clienteCompleto = await this.prisma.cliente.findUnique({
+        where: { id: atualizado.cliente.id },
+        select: { email: true },
+      });
+      if (clienteCompleto?.email) {
+        const jaTemAvaliacao = await this.prisma.avaliacaoCliente.findUnique({
+          where: { agendamentoId: id },
+        });
+        if (!jaTemAvaliacao) {
+          const tenant = await this.prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { nome: true },
+          });
+          const token = await this.avaliacoes.criarPendente(
+            id,
+            atualizado.cliente.id,
+            tenantId,
+          );
+          const baseUrl = this.config.get<string>(
+            'FRONTEND_URL',
+            'https://app.aninpet.com.br',
+          );
+          const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
+          this.email
+            .enviarPesquisaSatisfacao(
+              clienteCompleto.email,
+              atualizado.cliente.nome,
+              atualizado.pet.nome,
+              atualizado.servico.nome,
+              tenant?.nome ?? 'Petshop',
+              linkAvaliacao,
+            )
+            .catch((err: unknown) =>
+              this.logger.error(
+                `Falha ao enviar pesquisa de satisfação: ${String(err)}`,
+              ),
+            );
+        }
       }
     }
 

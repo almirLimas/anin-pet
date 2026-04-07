@@ -214,4 +214,55 @@ export class EmailService {
       );
     }
   }
+
+  async enviarPesquisaSatisfacao(
+    email: string,
+    nomeCliente: string,
+    nomePet: string,
+    nomeServico: string,
+    nomePetshop: string,
+    linkAvaliacao: string,
+  ) {
+    const estrelas = [1, 2, 3, 4, 5]
+      .map(
+        (n) =>
+          `<a href="${linkAvaliacao}?nota=${n}"
+             style="display:inline-block;margin:0 4px;padding:10px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-decoration:none;font-size:22px;color:#f59e0b;">
+            ${'⭐'.repeat(n)}
+          </a>`,
+      )
+      .join('');
+
+    try {
+      await this.enviar(
+        email,
+        `Como foi o ${nomeServico} do ${nomePet}? — ${nomePetshop}`,
+        `
+        <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
+          <h2 style="color: #1d9fb6;">Como foi a experiência? 🐾</h2>
+          <p>Olá, <strong>${nomeCliente}</strong>!</p>
+          <p>
+            O <strong>${nomeServico}</strong> do <strong>${nomePet}</strong> no
+            <strong>${nomePetshop}</strong> acabou de ser concluído.
+            Sua opinião é muito importante para continuarmos melhorando!
+          </p>
+          <p style="font-weight:bold;margin-bottom:8px;">Clique para avaliar sua experiência:</p>
+          <div style="text-align:center;margin:24px 0;">
+            ${estrelas}
+          </div>
+          <p style="color:#6b7280;font-size:13px;">
+            Leva menos de 10 segundos e nos ajuda a oferecer um serviço cada vez melhor para você e seu pet. 😊
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enviar pesquisa de satisfação para ${email}`,
+        err,
+      );
+    }
+  }
 }
