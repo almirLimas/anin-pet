@@ -17,10 +17,7 @@ import { AvaliacoesModule } from './avaliacoes/avaliacoes.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      ignoreEnvFile: process.env.NODE_ENV === 'production',
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
