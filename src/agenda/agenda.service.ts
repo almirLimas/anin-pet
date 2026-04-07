@@ -165,10 +165,11 @@ export class AgendaService {
             atualizado.cliente.id,
             tenantId,
           );
-          const baseUrl = this.config.get<string>(
-            'FRONTEND_URL',
-            'https://app.aninpet.com.br',
-          );
+          const baseUrl = this.config
+            .get<string>('FRONTEND_URL', 'https://app.aninpet.com.br')
+            .split(',')[0]
+            .trim()
+            .replace(/\/$/, '');
           const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
           this.logger.log(
             `[Satisfação] Enviando e-mail para ${clienteCompleto.email} — link: ${linkAvaliacao}`,
