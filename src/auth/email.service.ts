@@ -238,12 +238,21 @@ export class EmailService {
     nomePetshop: string,
     linkAvaliacao: string,
   ) {
-    const estrelas = [1, 2, 3, 4, 5]
+    const opcoes = [
+      { nota: 1, emoji: '😞', label: 'Muito ruim' },
+      { nota: 2, emoji: '😕', label: 'Ruim' },
+      { nota: 3, emoji: '😐', label: 'Regular' },
+      { nota: 4, emoji: '🙂', label: 'Bom' },
+      { nota: 5, emoji: '😍', label: 'Excelente' },
+    ];
+
+    const estrelas = opcoes
       .map(
-        (n) =>
+        ({ nota: n, emoji, label }) =>
           `<a href="${linkAvaliacao}?nota=${n}"
-             style="display:inline-block;margin:0 4px;padding:10px 16px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-decoration:none;font-size:22px;color:#f59e0b;">
-            ${'⭐'.repeat(n)}
+             style="display:inline-block;margin:0 6px;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;text-decoration:none;text-align:center;min-width:60px;">
+            <div style="font-size:28px;line-height:1;">${emoji}</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:4px;">${label}</div>
           </a>`,
       )
       .join('');
