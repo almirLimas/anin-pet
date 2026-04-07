@@ -73,11 +73,26 @@ export class PagamentoService {
   async cancelarAssinatura(tenantId: string) {
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: tenantId },
-      select: { assinaturaStatus: true },
+      select: { assinaturaStatus: true, mpAssinaturaId: true },
     });
 
     if (tenant.assinaturaStatus === 'cancelada') {
       throw new UnprocessableEntityException('Assinatura já está cancelada');
+    }
+
+    // Cancela no Mercado Pago para interromper as cobranças recorrentes
+    if (tenant.mpAssinaturaId) {
+      try {
+        await new PreApproval(this.mpClient).update({
+          id: tenant.mpAssinaturaId,
+          body: { status: 'cancelled' } as any,
+        });
+      } catch (err) {
+        this.logger.error('Erro ao cancelar PreApproval no Mercado Pago', err);
+        throw new InternalServerErrorException(
+          'Não foi possível cancelar a assinatura no Mercado Pago. Tente novamente.',
+        );
+      }
     }
 
     await this.prisma.tenant.update({
@@ -143,6 +158,10 @@ export class PagamentoService {
             frequency_type: 'months',
             transaction_amount: preco,
             currency_id: 'BRL',
+            free_trial: {
+              frequency: 14,
+              frequency_type: 'days',
+            },
           },
           back_url: `${frontendUrl}/renovar-assinatura/sucesso`,
           notification_url: `${apiUrl}/pagamento/webhook`,
