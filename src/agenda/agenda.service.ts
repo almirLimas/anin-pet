@@ -141,11 +141,21 @@ export class AgendaService {
         where: { id: atualizado.cliente.id },
         select: { email: true },
       });
+
+      this.logger.log(
+        `[Satisfação] Agendamento ${id} concluído — e-mail do cliente: ${clienteCompleto?.email ?? 'NÃO CADASTRADO'}`,
+      );
+
       if (clienteCompleto?.email) {
         const jaTemAvaliacao = await this.prisma.avaliacaoCliente.findUnique({
           where: { agendamentoId: id },
         });
-        if (!jaTemAvaliacao) {
+
+        if (jaTemAvaliacao) {
+          this.logger.log(
+            `[Satisfação] Avaliação já existe para agendamento ${id}, pulando envio.`,
+          );
+        } else {
           const tenant = await this.prisma.tenant.findUnique({
             where: { id: tenantId },
             select: { nome: true },
@@ -160,6 +170,9 @@ export class AgendaService {
             'https://app.aninpet.com.br',
           );
           const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
+          this.logger.log(
+            `[Satisfação] Enviando e-mail para ${clienteCompleto.email} — link: ${linkAvaliacao}`,
+          );
           this.email
             .enviarPesquisaSatisfacao(
               clienteCompleto.email,
@@ -171,7 +184,7 @@ export class AgendaService {
             )
             .catch((err: unknown) =>
               this.logger.error(
-                `Falha ao enviar pesquisa de satisfação: ${String(err)}`,
+                `[Satisfação] Falha ao enviar e-mail para ${clienteCompleto.email}: ${String(err)}`,
               ),
             );
         }
