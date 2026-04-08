@@ -184,8 +184,8 @@ model Servico {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  agendamentos Agendamento[]
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  agendamentos AgendamentoServico[]
 }
 
 // ── Agenda ───────────────────────────────────────────────────────────────────
@@ -213,17 +213,26 @@ model Agendamento {
   taxaBusca   Decimal?               @db.Decimal(10, 2)
   clienteId   String
   petId       String
-  servicoId   String
   tenantId    String
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  cliente     Cliente      @relation(fields: [clienteId], references: [id])
-  pet         Pet          @relation(fields: [petId], references: [id])
-  servico     Servico      @relation(fields: [servicoId], references: [id])
+  tenant      Tenant                @relation(fields: [tenantId], references: [id])
+  cliente     Cliente               @relation(fields: [clienteId], references: [id])
+  pet         Pet                   @relation(fields: [petId], references: [id])
+  servicos    AgendamentoServico[]
   lancamentos Lancamento[]
   avaliacao   AvaliacaoCliente?
+}
+
+model AgendamentoServico {
+  agendamentoId String
+  servicoId     String
+
+  agendamento Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  servico     Servico     @relation(fields: [servicoId], references: [id])
+
+  @@id([agendamentoId, servicoId])
 }
 
 // ── Financeiro ───────────────────────────────────────────────────────────────────────

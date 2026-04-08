@@ -40,7 +40,7 @@ export class FinanceiroService {
           select: {
             id: true,
             pet: { select: { nome: true } },
-            servico: { select: { nome: true } },
+            servicos: { include: { servico: { select: { nome: true } } } },
           },
         },
       },

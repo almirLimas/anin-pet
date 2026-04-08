@@ -26,8 +26,12 @@ export class AgendaService {
     return {
       cliente: { select: { id: true, nome: true, telefonePrincipal: true } },
       pet: { select: { id: true, nome: true, especie: true } },
-      servico: {
-        select: { id: true, nome: true, preco: true, duracaoMinutos: true },
+      servicos: {
+        include: {
+          servico: {
+            select: { id: true, nome: true, preco: true, duracaoMinutos: true },
+          },
+        },
       },
     };
   }
@@ -62,11 +66,16 @@ export class AgendaService {
   }
 
   async create(tenantId: string, dto: CreateAgendamentoDto) {
+    const { servicoIds, taxaBusca, dataHora, ...rest } = dto;
     const agendamento = await this.prisma.agendamento.create({
       data: {
-        ...dto,
+        ...rest,
         tenantId,
-        dataHora: new Date(dto.dataHora),
+        dataHora: new Date(dataHora),
+        ...(taxaBusca !== undefined && { taxaBusca }),
+        servicos: {
+          create: servicoIds.map((sid) => ({ servicoId: sid })),
+        },
       },
       include: this.include,
     });
@@ -87,10 +96,13 @@ export class AgendaService {
         hour: '2-digit',
         minute: '2-digit',
       });
+      const nomesServicos = agendamento.servicos
+        .map((s) => s.servico.nome)
+        .join(', ');
       const mensagem =
         `Olá, ${agendamento.cliente.nome}! 🐾 Seu agendamento foi confirmado.\n` +
         `Pet: ${agendamento.pet.nome}\n` +
-        `Serviço: ${agendamento.servico.nome}\n` +
+        `Serviço: ${nomesServicos}\n` +
         `Data: ${dataFormatada} às ${horaFormatada}\n` +
         `Até lá! 😊`;
 
@@ -109,11 +121,18 @@ export class AgendaService {
 
   async update(tenantId: string, id: string, dto: UpdateAgendamentoDto) {
     await this.findOne(tenantId, id);
+    const { servicoIds, ...restDto } = dto;
     const atualizado = await this.prisma.agendamento.update({
       where: { id },
       data: {
-        ...dto,
-        ...(dto.dataHora && { dataHora: new Date(dto.dataHora) }),
+        ...restDto,
+        ...(restDto.dataHora && { dataHora: new Date(restDto.dataHora) }),
+        ...(servicoIds && {
+          servicos: {
+            deleteMany: {},
+            create: servicoIds.map((sid) => ({ servicoId: sid })),
+          },
+        }),
       } as Prisma.AgendamentoUncheckedUpdateInput,
       include: this.include,
     });
@@ -134,11 +153,18 @@ export class AgendaService {
         const taxaBusca = atualizado.taxaBusca
           ? Number(atualizado.taxaBusca)
           : 0;
-        const valorTotal = Number(atualizado.servico.preco) + taxaBusca;
+        const totalServicos = atualizado.servicos.reduce(
+          (sum, as) => sum + Number(as.servico.preco),
+          0,
+        );
+        const valorTotal = totalServicos + taxaBusca;
+        const nomesServicos = atualizado.servicos
+          .map((as) => as.servico.nome)
+          .join(', ');
         const descricao =
           taxaBusca > 0
-            ? `${atualizado.servico.nome} — ${atualizado.pet.nome} (+ taxa de busca)`
-            : `${atualizado.servico.nome} — ${atualizado.pet.nome}`;
+            ? `${nomesServicos} — ${atualizado.pet.nome} (+ taxa de busca)`
+            : `${nomesServicos} — ${atualizado.pet.nome}`;
 
         await this.financeiro.criar(
           {
@@ -195,7 +221,7 @@ export class AgendaService {
               clienteCompleto.email,
               atualizado.cliente.nome,
               atualizado.pet.nome,
-              atualizado.servico.nome,
+              atualizado.servicos[0]?.servico.nome ?? 'Serviço',
               tenant?.nome ?? 'Petshop',
               linkAvaliacao,
             )

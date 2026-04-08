@@ -1,4 +1,11 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ModalidadeAgendamento, StatusAgendamento } from '@prisma/client';
 import { Type } from 'class-transformer';
@@ -12,9 +19,10 @@ export class CreateAgendamentoDto {
   @IsString()
   petId: string;
 
-  @ApiProperty()
-  @IsString()
-  servicoId: string;
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  servicoIds: string[];
 
   @ApiProperty({ description: 'ISO 8601 datetime string' })
   @IsString()

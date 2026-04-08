@@ -113,7 +113,8 @@ export class RelatoriosService {
         STRING_AGG(DISTINCT s.nome, ', ') AS servicos
       FROM "Cliente" c
       JOIN "Agendamento" a ON a."clienteId" = c.id
-      JOIN "Servico" s ON s.id = a."servicoId"
+      JOIN "AgendamentoServico" ags ON ags."agendamentoId" = a.id
+      JOIN "Servico" s ON s.id = ags."servicoId"
       WHERE
         a.status = 'Concluido'
         AND c.status = 'Ativo'
@@ -151,36 +152,41 @@ export class RelatoriosService {
     const inicio = new Date(ano, mesNum - 1, 1);
     const fim = new Date(ano, mesNum, 1);
 
-    const grupos = await this.prisma.agendamento.groupBy({
-      by: ['servicoId'],
-      where: {
-        tenantId,
-        dataHora: { gte: inicio, lt: fim },
-        status: 'Concluido',
-      },
-      _count: { id: true },
-      orderBy: { _count: { id: 'desc' } },
-      take: 10,
-    });
+    const rows = await this.prisma.$queryRaw<
+      {
+        servicoId: string;
+        nome: string;
+        categoria: string;
+        preco: number;
+        quantidade: bigint;
+      }[]
+    >`
+      SELECT
+        s.id AS "servicoId",
+        s.nome,
+        s.categoria::text,
+        s.preco,
+        COUNT(*)::int AS quantidade
+      FROM "AgendamentoServico" ags
+      JOIN "Agendamento" a ON a.id = ags."agendamentoId"
+      JOIN "Servico" s ON s.id = ags."servicoId"
+      WHERE
+        a."tenantId" = ${tenantId}
+        AND a."dataHora" >= ${inicio}
+        AND a."dataHora" < ${fim}
+        AND a.status = 'Concluido'
+      GROUP BY s.id, s.nome, s.categoria, s.preco
+      ORDER BY quantidade DESC
+      LIMIT 10
+    `;
 
-    if (grupos.length === 0) return [];
-
-    const ids = grupos.map((g) => g.servicoId);
-    const detalhes = await this.prisma.servico.findMany({
-      where: { tenantId, id: { in: ids } },
-      select: { id: true, nome: true, categoria: true, preco: true },
-    });
-
-    return grupos.map((g) => {
-      const d = detalhes.find((s) => s.id === g.servicoId);
-      return {
-        servicoId: g.servicoId,
-        nome: d?.nome ?? 'Desconhecido',
-        categoria: d?.categoria,
-        quantidade: g._count.id,
-        receitaEstimada: Number(d?.preco ?? 0) * g._count.id,
-      };
-    });
+    return rows.map((r) => ({
+      servicoId: r.servicoId,
+      nome: r.nome,
+      categoria: r.categoria,
+      quantidade: Number(r.quantidade),
+      receitaEstimada: Number(r.preco) * Number(r.quantidade),
+    }));
   }
 
   // â”€â”€ helper privado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

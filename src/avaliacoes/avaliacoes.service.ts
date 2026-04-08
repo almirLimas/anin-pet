@@ -82,7 +82,7 @@ export class AvaliacoesService {
         agendamento: {
           select: {
             dataHora: true,
-            servico: { select: { nome: true } },
+            servicos: { include: { servico: { select: { nome: true } } } },
             pet: { select: { nome: true } },
           },
         },

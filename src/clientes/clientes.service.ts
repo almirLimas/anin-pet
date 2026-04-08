@@ -47,7 +47,7 @@ export class ClientesService {
         agendamentos: {
           orderBy: { dataHora: 'desc' },
           take: 10,
-          include: { servico: true },
+          include: { servicos: { include: { servico: true } } },
         },
       },
     });
