@@ -112,6 +112,10 @@ model Cliente {
   dataNascimento     String?
   comoConheceu       String?
   observacoes        String?
+  mensalista              Boolean       @default(false)
+  valorMensal             Decimal?      @db.Decimal(10, 2)
+  diaVencimento           Int?
+  ultimaMensalidadePaga   DateTime?
   status             StatusCliente @default(Ativo)
   tenantId           String
   createdAt          DateTime      @default(now())

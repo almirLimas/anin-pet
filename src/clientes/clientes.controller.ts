@@ -66,6 +66,14 @@ export class ClientesController {
     return this.clientesService.update(usuario.tenantId, id, dto);
   }
 
+  @Post(':id/pagar-mensalidade')
+  pagarMensalidade(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.clientesService.pagarMensalidade(usuario.tenantId, id);
+  }
+
   @Delete(':id')
   remove(
     @UsuarioAtual() usuario: { tenantId: string },

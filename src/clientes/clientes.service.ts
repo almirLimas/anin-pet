@@ -114,4 +114,55 @@ export class ClientesService {
     await this.findOne(tenantId, id);
     return this.prisma.cliente.delete({ where: { id } });
   }
+
+  async pagarMensalidade(tenantId: string, id: string) {
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!cliente) throw new NotFoundException('Cliente não encontrado');
+
+    if (!cliente.mensalista) {
+      throw new NotFoundException('Cliente não é mensalista');
+    }
+
+    const valor = Number(cliente.valorMensal ?? 0);
+    if (valor <= 0) {
+      throw new NotFoundException(
+        'Cliente mensalista sem valor mensal configurado',
+      );
+    }
+
+    // Verifica se já pagou no mês atual
+    if (cliente.ultimaMensalidadePaga) {
+      const ultima = new Date(cliente.ultimaMensalidadePaga);
+      const agora = new Date();
+      if (
+        ultima.getFullYear() === agora.getFullYear() &&
+        ultima.getMonth() === agora.getMonth()
+      ) {
+        throw new NotFoundException('Mensalidade deste mês já foi confirmada');
+      }
+    }
+
+    const agora = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.cliente.update({
+        where: { id },
+        data: { ultimaMensalidadePaga: agora },
+      });
+
+      return tx.lancamento.create({
+        data: {
+          tipo: 'Receita',
+          valor,
+          descricao: `Mensalidade - ${cliente.nome}`,
+          categoria: 'Outro',
+          data: agora,
+          tenantId,
+        },
+      });
+    });
+  }
 }

@@ -1,10 +1,15 @@
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsEnum,
+  IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Matches,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -144,6 +149,26 @@ export class CreateClienteDto {
   @IsString()
   @Transform(toOptionalString)
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Cliente mensalista (plano mensal)' })
+  @IsOptional()
+  @IsBoolean()
+  mensalista?: boolean;
+
+  @ApiPropertyOptional({ description: 'Valor mensal cobrado (R$)' })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  valorMensal?: number;
+
+  @ApiPropertyOptional({ description: 'Dia do vencimento (1-31)' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  @Type(() => Number)
+  diaVencimento?: number;
 
   @ApiPropertyOptional({ enum: StatusCliente, default: StatusCliente.Ativo })
   @IsOptional()
