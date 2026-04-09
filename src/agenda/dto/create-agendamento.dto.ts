@@ -13,20 +13,20 @@ import { Type } from 'class-transformer';
 export class CreateAgendamentoDto {
   @ApiProperty()
   @IsString()
-  clienteId: string;
+  clienteId!: string;
 
   @ApiProperty()
   @IsString()
-  petId: string;
+  petId!: string;
 
   @ApiProperty({ type: [String] })
   @IsArray()
   @IsString({ each: true })
-  servicoIds: string[];
+  servicoIds!: string[];
 
   @ApiProperty({ description: 'ISO 8601 datetime string' })
   @IsString()
-  dataHora: string;
+  dataHora!: string;
 
   @ApiPropertyOptional({ enum: StatusAgendamento })
   @IsOptional()
