@@ -25,6 +25,11 @@ export class CreateProdutoDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  marca?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   unidade?: string;
 
   @ApiProperty()

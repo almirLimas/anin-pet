@@ -65,6 +65,8 @@ model Tenant {
   movimentacoes Movimentacao[]
   vacinas       Vacina[]
   avaliacoes    AvaliacaoCliente[]
+  vendas        Venda[]
+  itensVenda    ItemVenda[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -125,6 +127,7 @@ model Cliente {
   pets         Pet[]
   agendamentos Agendamento[]
   avaliacoes   AvaliacaoCliente[]
+  vendas       Venda[]
 
   @@unique([tenantId, cpf])
   @@unique([tenantId, codigo])
@@ -190,6 +193,7 @@ model Servico {
 
   tenant       Tenant                @relation(fields: [tenantId], references: [id])
   agendamentos AgendamentoServico[]
+  itensVenda   ItemVenda[]
 }
 
 // ── Agenda ───────────────────────────────────────────────────────────────────
@@ -305,6 +309,7 @@ model Produto {
   categoria       CategoriaEstoque
   unidade         String?
   codigoBarras    String?
+  marca           String?
   quantidadeAtual Int              @default(0)
   estoqueMinimo   Int              @default(0)
   precoCompra     Decimal          @db.Decimal(10, 2)
@@ -317,6 +322,7 @@ model Produto {
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   movimentacoes Movimentacao[]
+  itensVenda    ItemVenda[]
 }
 
 enum TipoMovimentacao {
@@ -364,4 +370,64 @@ model Vacina {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   pet    Pet    @relation(fields: [petId], references: [id], onDelete: Cascade)
+}
+
+// ── PDV (Ponto de Venda) ─────────────────────────────────────────────────────
+
+enum FormaPagamento {
+  Dinheiro
+  Cartao
+  Pix
+  Fiado
+  Outro
+}
+
+enum StatusVenda {
+  Concluida
+  Cancelada
+}
+
+enum TipoItemVenda {
+  Produto
+  Servico
+}
+
+model Venda {
+  id             String         @id @default(cuid())
+  numero         Int
+  status         StatusVenda    @default(Concluida)
+  formaPagamento FormaPagamento
+  valorTotal     Decimal        @db.Decimal(10, 2)
+  desconto       Decimal?       @db.Decimal(10, 2)
+  valorPago      Decimal?       @db.Decimal(10, 2)
+  troco          Decimal?       @db.Decimal(10, 2)
+  observacoes    String?
+  clienteId      String?
+  tenantId       String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant  Tenant     @relation(fields: [tenantId], references: [id])
+  cliente Cliente?   @relation(fields: [clienteId], references: [id])
+  itens   ItemVenda[]
+
+  @@unique([tenantId, numero])
+}
+
+model ItemVenda {
+  id            String       @id @default(cuid())
+  tipo          TipoItemVenda
+  nome          String
+  quantidade    Int
+  precoUnitario Decimal      @db.Decimal(10, 2)
+  subtotal      Decimal      @db.Decimal(10, 2)
+  produtoId     String?
+  servicoId     String?
+  vendaId       String
+  tenantId      String
+
+  venda   Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  produto Produto? @relation(fields: [produtoId], references: [id])
+  servico Servico? @relation(fields: [servicoId], references: [id])
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
 }
