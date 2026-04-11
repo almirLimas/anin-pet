@@ -213,13 +213,14 @@ enum ModalidadeAgendamento {
 }
 
 model Agendamento {
-  id          String                 @id @default(cuid())
-  dataHora    DateTime
-  observacoes String?
-  status      StatusAgendamento      @default(Agendado)
-  modalidade  ModalidadeAgendamento  @default(ClienteTraz)
-  taxaBusca   Decimal?               @db.Decimal(10, 2)
-  clienteId   String
+  id             String                 @id @default(cuid())
+  dataHora       DateTime
+  observacoes    String?
+  status         StatusAgendamento      @default(Agendado)
+  modalidade     ModalidadeAgendamento  @default(ClienteTraz)
+  taxaBusca      Decimal?               @db.Decimal(10, 2)
+  enderecoBusca  String?
+  clienteId      String
   petId       String
   tenantId    String
   createdAt   DateTime               @default(now())

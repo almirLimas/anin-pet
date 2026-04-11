@@ -51,4 +51,11 @@ export class CreateAgendamentoDto {
   @Min(0)
   @Type(() => Number)
   taxaBusca?: number;
+
+  @ApiPropertyOptional({
+    description: 'Endereço de busca quando o petshop vai retirar o pet',
+  })
+  @IsOptional()
+  @IsString()
+  enderecoBusca?: string;
 }
