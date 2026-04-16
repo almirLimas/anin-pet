@@ -98,7 +98,7 @@ export class EmailService {
             </tr>
           </table>
 
-          <p style="color:#6b7280;font-size:13px;">Você tem <strong>14 dias de teste gratuito</strong>. Aproveite para explorar todas as funcionalidades!</p>
+          <p style="color:#6b7280;font-size:13px;">Você tem <strong>7 dias de teste gratuito</strong>. Aproveite para explorar todas as funcionalidades!</p>
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
           <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
         </div>
@@ -152,7 +152,7 @@ export class EmailService {
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
           <h2 style="color: #1d9fb6;">Hora de assinar o AninPet 🐾</h2>
           <p>Olá, <strong>${nome}</strong>!</p>
-          <p>Seus 14 dias de teste gratuito chegaram ao fim. Para continuar usando o sistema sem interrupções, ative sua assinatura agora.</p>
+          <p>Seus 7 dias de teste gratuito chegaram ao fim. Para continuar usando o sistema sem interrupções, ative sua assinatura agora.</p>
           <div style="text-align: center; margin: 32px 0;">
             <a href="${link}"
                style="background:#1d9fb6;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-size:16px;">

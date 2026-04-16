@@ -50,13 +50,33 @@ export class PagamentoService {
   ) {
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: tenantId },
-      select: { assinaturaStatus: true },
+      select: { assinaturaStatus: true, trialExpiraEm: true, plano: true },
     });
 
     if (tenant.assinaturaStatus === 'ativa') {
       throw new UnprocessableEntityException(
         'Este tenant já possui uma assinatura ativa',
       );
+    }
+
+    // If still within the trial period, don't create a payment — just confirm trial
+    if (
+      tenant.assinaturaStatus === 'trial' &&
+      tenant.trialExpiraEm &&
+      tenant.trialExpiraEm > new Date()
+    ) {
+      return {
+        tipo: 'trial' as const,
+        trialExpiraEm: tenant.trialExpiraEm.toISOString(),
+      };
+    }
+
+    // Update the plan if a different one was selected
+    if (dto.plano && dto.plano !== tenant.plano) {
+      await this.prisma.tenant.update({
+        where: { id: tenantId },
+        data: { plano: dto.plano },
+      });
     }
 
     return this.criarPreApproval(dto.plano, tenantId, email);
@@ -144,6 +164,14 @@ export class PagamentoService {
       .split(',')[0]
       .trim()
       .replace(/\/$/, '');
+    // MP requires a publicly accessible URL — use MP_BACK_URL if set,
+    // otherwise fall back to production URL when running locally
+    const backUrl = (
+      this.config.get<string>('MP_BACK_URL') ??
+      (frontendUrl.includes('localhost')
+        ? 'https://app.aninpet.com.br'
+        : frontendUrl)
+    ).replace(/\/$/, '');
     const apiUrl = this.config.getOrThrow<string>('BASE_URL');
 
     try {
@@ -163,7 +191,7 @@ export class PagamentoService {
               frequency_type: 'days',
             },
           },
-          back_url: `${frontendUrl}/renovar-assinatura/sucesso`,
+          back_url: `${backUrl}/renovar-assinatura/sucesso`,
           notification_url: `${apiUrl}/pagamento/webhook`,
           status: 'pending',
         } as any,

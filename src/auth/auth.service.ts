@@ -98,7 +98,7 @@ export class AuthService {
 
     // Cria o tenant (petshop) e o usuário admin em uma transação
     const resultado = await this.prisma.$transaction(async (tx) => {
-      const trialExpiraEm = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      const trialExpiraEm = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
       const tenant = await tx.tenant.create({
         data: {
