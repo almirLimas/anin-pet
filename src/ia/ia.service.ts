@@ -620,8 +620,8 @@ ATENÇÃO — CONCLUIR ≠ CRIAR:
 VALIDAÇÕES OBRIGATÓRIAS (aplique ANTES de chamar qualquer função de cadastro):
 
 CLIENTE:
-- nome: apenas letras, acentos, espaços, apóstrofo e hífen. PROIBIDO números ou símbolos. Mínimo 3 caracteres.
-- telefonePrincipal: somente dígitos, deve ter 10 ou 11 dígitos (com DDD). Se inválido, peça novamente.
+- nome: valide APENAS o formato — aceite qualquer combinação de letras (incluindo nomes incomuns, estrangeiros ou que pareçam marcas), acentos, espaços, apóstrofo e hífen. PROIBIDO números ou símbolos. Mínimo 3 caracteres. NÃO julgue se o nome parece real ou não — apenas verifique os caracteres.
+- telefonePrincipal: ANTES de validar, remova espaços, traços, parênteses e outros caracteres de formatação e extraia apenas os dígitos. O número de dígitos resultante deve ser 10 ou 11 (com DDD). Se inválido após a limpeza, peça novamente.
 - email: formato válido (usuario@dominio.com). Se inválido, peça novamente ou confirme que não tem e-mail.
 - cpf: se informado, deve ter 11 dígitos numéricos e ser um CPF válido (dígitos verificadores corretos).
 - cep: deve ter 8 dígitos numéricos.
@@ -660,18 +660,17 @@ AGENDAMENTO:
 - Se houver múltiplos resultados em qualquer busca, liste as opções com nome e telefone/detalhe e peça confirmação.
 
 FLUXO PARA CADASTRO DE CLIENTE:
-1. Nome completo (valide: só letras/acentos, mín. 3 chars)
-2. WhatsApp (valide: 10 ou 11 dígitos com DDD)
+1. Nome completo (valide: só letras/acentos/espaços/hífen/apóstrofo, mín. 3 chars — aceite qualquer nome, não julgue se parece marca ou nome incomum)
+2. WhatsApp (remova espaços e formatação, valide: 10 ou 11 dígitos com DDD)
 3. E-mail (opcional) e CPF (opcional) — pode perguntar juntos
 4. Pergunte: "O cliente é mensalista (plano mensal)?"
    - Se sim: pergunte o valor mensal (R$) e o dia de vencimento (1 a 28)
    - Se não: mensalista = false, não pergunte valor nem dia
 5. CEP → chame buscar_cep IMEDIATAMENTE ao receber o CEP
-5. CEP → chame buscar_cep IMEDIATAMENTE ao receber o CEP
    - Se encontrar o endereço: apresente rua, bairro e cidade e pergunte "Os dados estão corretos?"
    - Se o usuário confirmar: pergunte APENAS o número (e complemento opcional)
    - Se o usuário disser que está errado: pergunte rua, bairro, cidade e estado manualmente
-   - Se o CEP não for encontrado (erro): avise e peça os dados manualmente
+   - Se o CEP não for encontrado (ViaCEP retornar erro): informe que não foi possível encontrar o CEP na base de dados e peça IMEDIATAMENTE os dados manualmente (rua, bairro, cidade, estado). NÃO peça um novo CEP — siga com o CEP informado e colete o endereço manualmente.
 6. OBRIGATÓRIO — Dados do pet: pergunte nome do pet, espécie, raça, sexo e peso
    - Diga: "Agora preciso dos dados do pet. Qual o nome dele?"
    - Colete: nome → espécie → raça (obrigatória) → sexo → peso (data de nascimento é opcional)
