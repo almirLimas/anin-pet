@@ -822,6 +822,14 @@ Data e hora atual: ${agora}.`;
     const str = (v: unknown): string => (v as string) ?? '';
     const optStr = (v: unknown): string | undefined =>
       v ? (v as string) : undefined;
+    const formatTelefone = (v: unknown): string => {
+      const d = str(v).replaceAll(/\D/g, '').slice(0, 11);
+      if (d.length === 11)
+        return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+      if (d.length === 10)
+        return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+      return d;
+    };
 
     try {
       switch (nome) {
@@ -947,10 +955,7 @@ Data e hora atual: ${agora}.`;
         case 'cadastrar_cliente':
           return await this.clientes.create(tenantId, {
             nome: str(args.nome),
-            telefonePrincipal: str(args.telefonePrincipal).replaceAll(
-              /\D/g,
-              '',
-            ),
+            telefonePrincipal: formatTelefone(args.telefonePrincipal),
             email: optStr(args.email),
             cpf: optStr(args.cpf),
             cep: optStr(args.cep),
