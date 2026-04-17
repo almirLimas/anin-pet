@@ -834,29 +834,52 @@ Data e hora atual: ${agora}.`;
     try {
       switch (nome) {
         case 'buscar_cep': {
-          const cepLimpo = str(args.cep).replaceAll(/\D/g, '');
+          const cepLimpo = str(args.cep).replaceAll(/\D/g, '').padStart(8, '0');
           if (cepLimpo.length !== 8) {
             return { erro: 'CEP inválido. O CEP deve ter 8 dígitos.' };
           }
-          const resp = await fetch(
-            `https://viacep.com.br/ws/${cepLimpo}/json/`,
-          );
-          if (!resp.ok) {
-            return {
-              erro: 'Não foi possível consultar o CEP. Tente novamente.',
-            };
+
+          // Tenta ViaCEP primeiro
+          try {
+            const resp = await fetch(
+              `https://viacep.com.br/ws/${cepLimpo}/json/`,
+            );
+            if (resp.ok) {
+              const dados = (await resp.json()) as Record<string, unknown>;
+              if (!dados.erro) {
+                return {
+                  cep: dados.cep,
+                  rua: dados.logradouro,
+                  bairro: dados.bairro,
+                  cidade: dados.localidade,
+                  estado: dados.uf,
+                };
+              }
+            }
+          } catch {
+            // ignora e tenta fallback
           }
-          const dados = (await resp.json()) as Record<string, unknown>;
-          if (dados.erro) {
-            return { erro: 'CEP não encontrado. Verifique o CEP informado.' };
+
+          // Fallback: BrasilAPI (cobertura mais ampla)
+          try {
+            const respBr = await fetch(
+              `https://brasilapi.com.br/api/cep/v2/${cepLimpo}`,
+            );
+            if (respBr.ok) {
+              const dados = (await respBr.json()) as Record<string, unknown>;
+              return {
+                cep: dados.cep,
+                rua: dados.street,
+                bairro: dados.neighborhood,
+                cidade: dados.city,
+                estado: dados.state,
+              };
+            }
+          } catch {
+            // ignora
           }
-          return {
-            cep: dados.cep,
-            rua: dados.logradouro,
-            bairro: dados.bairro,
-            cidade: dados.localidade,
-            estado: dados.uf,
-          };
+
+          return { erro: 'CEP não encontrado. Verifique o CEP informado.' };
         }
 
         case 'cadastrar_servico': {
