@@ -18,6 +18,7 @@ import { PagamentoModule } from './pagamento/pagamento.module';
 import { AvaliacoesModule } from './avaliacoes/avaliacoes.module';
 import { PdvModule } from './pdv/pdv.module';
 import { IaModule } from './ia/ia.module';
+import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { IaModule } from './ia/ia.module';
     AvaliacoesModule,
     PdvModule,
     IaModule,
+    OrdemServicoModule,
   ],
 })
 export class AppModule {}

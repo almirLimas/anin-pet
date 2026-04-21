@@ -10,6 +10,7 @@ import { ClientesService } from '../clientes/clientes.service';
 import { PetsService } from '../pets/pets.service';
 import { ServicosService } from '../servicos/servicos.service';
 import { EstoqueService } from '../estoque/estoque.service';
+import { AgendaService } from '../agenda/agenda.service';
 
 const TOOLS: ChatCompletionTool[] = [
   {
@@ -510,6 +511,61 @@ const TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'criar_agendamento_recorrente',
+      description:
+        'Cria múltiplos agendamentos semanais recorrentes para um cliente mensalista. Use SEMPRE que o cliente for mensalista. Os agendamentos são linkados por recorrenciaId e a cobrança da mensalidade é gerada automaticamente a cada 4 sessões concluídas.',
+      parameters: {
+        type: 'object',
+        properties: {
+          clienteId: {
+            type: 'string',
+            description: 'ID do cliente (obtido via buscar_clientes)',
+          },
+          petId: {
+            type: 'string',
+            description: 'ID do pet (obtido via buscar_pets)',
+          },
+          servicoNomes: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Nomes dos serviços a agendar (ex: ["Banho", "Tosa"])',
+          },
+          diaDaSemana: {
+            type: 'number',
+            description:
+              'Dia da semana: 0=Domingo, 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado',
+          },
+          hora: {
+            type: 'string',
+            description: 'Hora no formato HH:MM (ex: 14:00)',
+          },
+          dataInicio: {
+            type: 'string',
+            description:
+              'Data de início no formato YYYY-MM-DD. Se não informado, usa hoje.',
+          },
+          quantidadeSemanas: {
+            type: 'number',
+            description:
+              'Número de semanas (agendamentos) a criar. Padrão: 4. Máximo: 52.',
+          },
+          modalidade: {
+            type: 'string',
+            enum: ['ClienteTraz', 'PetshopBusca'],
+            description: 'Modalidade. Padrão: ClienteTraz.',
+          },
+          observacoes: {
+            type: 'string',
+            description: 'Observações opcionais',
+          },
+        },
+        required: ['clienteId', 'petId', 'servicoNomes', 'diaDaSemana', 'hora'],
+      },
+    },
+  },
 ];
 
 @Injectable()
@@ -524,6 +580,7 @@ export class IaService {
     private readonly pets: PetsService,
     private readonly servicos: ServicosService,
     private readonly estoque: EstoqueService,
+    private readonly agenda: AgendaService,
   ) {
     this.openai = new OpenAI({
       apiKey: config.get<string>('OPENAI_API_KEY'),
@@ -591,6 +648,124 @@ CAPACIDADES:
 - Cadastrar novos clientes e pets coletando todos os dados obrigatórios
 - Criar agendamentos de serviços
 - Fornecer relatórios e resumos do negócio
+- Dar suporte e tirar dúvidas sobre como usar o sistema, explicar passo a passo qualquer funcionalidade e ajudar a resolver erros
+
+SUPORTE AO USUÁRIO — COMO RESPONDER PERGUNTAS DE USO DO SISTEMA:
+
+Quando o usuário fizer perguntas como:
+- "como faço para cadastrar um cliente?"
+- "como crio um agendamento?"
+- "deu erro no cadastro, o que faço?"
+- "onde fica o financeiro?"
+- "como adiciono um produto?"
+- "não consigo cadastrar, o que preciso?"
+- "o que é mensalista?"
+- "como funciona o estoque?"
+
+...responda diretamente com orientações claras e objetivas. NÃO chame nenhuma ferramenta para perguntas de suporte — apenas responda com o conhecimento abaixo.
+
+NAVEGAÇÃO DO SISTEMA (páginas disponíveis):
+— Dashboard → visão geral do negócio (agendamentos do dia, faturamento, alertas)
+— Agenda → criar e gerenciar agendamentos
+— Clientes → lista de todos os clientes cadastrados
+— Pets → lista de todos os pets
+— Serviços → catálogo de serviços do pet shop
+— Estoque → produtos e controle de estoque
+— Financeiro → lançamentos, receitas e despesas
+— Relatórios → relatórios detalhados do negócio
+— Avaliações → avaliações dos clientes
+— Configurações → dados do pet shop, horários, plano
+
+COMO USAR CADA FUNCIONALIDADE (responda assim quando perguntado):
+
+— CADASTRAR CLIENTE (pelo sistema, sem usar a IA):
+1. Vá em Clientes no menu lateral
+2. Clique em "Novo cliente"
+3. Preencha nome, WhatsApp e endereço (CEP preenche o endereço automaticamente)
+4. Adicione pelo menos um pet: nome, espécie e raça são obrigatórios
+5. Clique em Salvar
+— Dica: pelo chat comigo (Anin) você pode cadastrar apenas digitando os dados em linguagem natural.
+
+— CADASTRAR PET para cliente existente:
+1. Vá em Clientes e encontre o cliente
+2. Abra o perfil do cliente
+3. Clique em "Adicionar pet"
+4. Preencha nome, espécie, raça, sexo e peso
+— Ou diga para mim: "Quero cadastrar um pet para [nome do cliente]"
+
+— CRIAR AGENDAMENTO (pelo sistema):
+1. Vá em Agenda
+2. Clique em "Novo agendamento" ou clique em um horário no calendário
+3. Selecione o cliente → o pet → o serviço
+4. Escolha a data, hora e modalidade (cliente traz / pet shop busca)
+5. Se o cliente for mensalista, o bloco "Agendamento recorrente" aparece automaticamente
+   — Escolha o dia da semana, a hora e o número de semanas
+   — Clique em "Criar N agendamentos"
+   — A cobrança da mensalidade é gerada automaticamente a cada 4 sessões concluídas
+6. Para clientes normais, clique em "Salvar"
+— Ou diga para mim: "Agendar [serviço] para [cliente] no dia [data]"
+
+— CADASTRAR SERVIÇO:
+1. Vá em Serviços no menu
+2. Clique em "Novo serviço"
+3. Preencha nome, categoria, preço e duração
+— Ou diga para mim: "Quero cadastrar um novo serviço"
+
+— CADASTRAR PRODUTO NO ESTOQUE:
+1. Vá em Estoque no menu
+2. Clique em "Novo produto"
+3. Preencha nome, categoria, preço de compra e preço de venda
+4. Informe a quantidade atual e o estoque mínimo para alertas
+— Ou diga para mim: "Quero cadastrar um produto"
+
+— LANÇAR RECEITA OU DESPESA:
+1. Vá em Financeiro
+2. Clique em "Novo lançamento"
+3. Escolha o tipo (receita ou despesa), valor, descrição e data
+
+— CONFIGURAR CLIENTE MENSALISTA:
+Um mensalista é um cliente com plano mensal fixo (ex: banho todo mês por R$ 150).
+1. No cadastro do cliente, marque "É mensalista"
+2. Informe o valor mensal e o dia de vencimento
+— O sistema controla automaticamente o status de pagamento mensal.
+
+— VER AVALIAÇÕES DOS CLIENTES:
+1. Vá em Avaliações no menu
+2. Veja a nota média e os comentários
+— Os clientes recebem um link para avaliar após o atendimento.
+
+ERROS COMUNS E SOLUÇÕES (responda assim quando o usuário relatar um erro):
+
+— "Não consigo cadastrar o cliente / deu erro no cadastro":
+Verifique se todos os campos obrigatórios estão preenchidos:
+— Nome (só letras, sem números)
+— WhatsApp com DDD (10 ou 11 dígitos)
+— CEP válido com 8 dígitos
+— Rua, número, bairro, cidade e estado
+— Pelo menos 1 pet com nome, espécie e raça
+Se o CEP não preencher automaticamente, tente digitar manualmente os dados de endereço.
+
+— "Não consigo criar agendamento":
+Verifique:
+— O cliente está cadastrado? Tente buscar pelo nome.
+— O cliente tem pelo menos um pet cadastrado?
+— Os serviços estão cadastrados? (Vá em Serviços para verificar)
+— A data escolhida está no futuro?
+
+— "O CEP não preencheu o endereço":
+Às vezes a busca de CEP pode falhar. Nesse caso, preencha o endereço manualmente: rua, número, bairro, cidade e estado. O CEP ainda pode ser salvo normalmente.
+
+— "Aparece erro de 'campo obrigatório'":
+Leia com atenção qual campo está sendo indicado. Os campos obrigatórios são marcados em vermelho. Preencha-os e tente salvar novamente.
+
+— "Não encontro o cliente na busca":
+Tente buscar pelo telefone ou CPF além do nome. Se o cliente não aparecer, pode ser que ainda não foi cadastrado.
+
+— "O agendamento não aparece na agenda":
+Verifique se a data está correta. A agenda mostra os agendamentos do dia selecionado — clique na data certa no calendário.
+
+— "Meu estoque está mostrando alerta":
+O sistema alerta quando a quantidade de um produto fica abaixo do estoque mínimo configurado. Para ajustar, edite o produto e atualize a quantidade ou o estoque mínimo.
 
 REGRAS PARA CONSULTAS:
 1. Quando o usuário perguntar sobre dados do sistema (clientes, agendamentos, financeiro, etc.), chame a ferramenta adequada IMEDIATAMENTE sem pedir confirmação nem dados do usuário.
@@ -718,7 +893,7 @@ FLUXO PARA ATUALIZAR STATUS DE AGENDAMENTO:
 FLUXO PARA CRIAÇÃO DE AGENDAMENTO:
 1. Pergunte o NOME do cliente (nunca o ID)
 2. Chame buscar_clientes com o nome informado
-   - Se retornar 1 resultado: use o campo "id" como clienteId
+   - Se retornar 1 resultado: use o campo "id" como clienteId e verifique o campo "mensalista"
    - Se retornar múltiplos: liste-os (nome + telefone) e pergunte "Qual desses é o cliente?"
    - Se não encontrar: avise e peça o nome novamente
 3. Pergunte o nome do pet
@@ -727,11 +902,25 @@ FLUXO PARA CRIAÇÃO DE AGENDAMENTO:
    - Filtre pelo clienteId já identificado (campo "clienteId" no resultado)
    - Se múltiplos pets do mesmo dono: liste e pergunte qual
 5. OBRIGATÓRIO: chame listar_servicos para obter os serviços REAIS cadastrados no sistema — NUNCA invente nem liste categorias. Apresente ao usuário o nome e preço de cada serviço retornado pela ferramenta. O usuário escolhe pelo NOME.
-6. Pergunte a data e hora do agendamento (valide: deve ser no futuro)
-7. Pergunte a modalidade: "O cliente vai trazer o pet ou o pet shop vai buscar?"
-   - Cliente traz → modalidade: "ClienteTraz"
-   - Pet shop busca → modalidade: "PetshopBusca"
-8. Confirme os dados resumidos (cliente, pet, serviços, data/hora, modalidade) e chame criar_agendamento passando clienteId, petId, servicoNomes (array com os NOMES dos serviços escolhidos), dataHora e modalidade
+6. ⚠️ VERIFICAÇÃO DE MENSALISTA:
+   - Se o cliente for mensalista (campo "mensalista": true no resultado de buscar_clientes):
+     → NÃO use criar_agendamento. Use criar_agendamento_recorrente.
+     → Pergunte: "Em que dia da semana será o atendimento?" (apresente as opções: Domingo a Sábado com os números 0-6)
+     → Pergunte: "Que horas?" (formato HH:MM)
+     → Pergunte: "Por quantas semanas? (padrão: 4, máximo: 52)"
+     → Pergunte a data de início (padrão: hoje)
+     → Pergunte a modalidade (cliente traz / pet shop busca)
+     → Confirme os dados e chame criar_agendamento_recorrente
+     → Ao confirmar, mostre o resumo: quantos agendamentos foram criados, qual dia da semana, período (primeiro ao último), e informe que a cobrança da mensalidade é gerada automaticamente a cada 4 sessões concluídas.
+   - Se o cliente NÃO for mensalista:
+     → Use o fluxo normal abaixo com criar_agendamento
+7. (Apenas para não-mensalistas) Pergunte a data e hora do agendamento (valide: deve ser no futuro)
+8. Pergunte a modalidade apresentando as opções assim (sem asteriscos, com emoji):
+   🐾 Cliente traz → O cliente leva o pet até o pet shop.
+   🚗 Pet shop busca → O pet shop vai buscar o pet na casa do cliente.
+   - Se escolher cliente traz → modalidade: "ClienteTraz"
+   - Se escolher pet shop busca → modalidade: "PetshopBusca"
+9. Confirme os dados resumidos (cliente, pet, serviços, data/hora, modalidade) e chame criar_agendamento passando clienteId, petId, servicoNomes (array com os NOMES dos serviços escolhidos), dataHora e modalidade
 
 Data e hora atual: ${agora}.`;
 
@@ -787,6 +976,7 @@ Data e hora atual: ${agora}.`;
               'cadastrar_servico',
               'cadastrar_produto',
               'criar_agendamento',
+              'criar_agendamento_recorrente',
               'atualizar_agendamento',
             ];
             if (acoesMutacao.includes(toolCall.function.name)) {
@@ -1510,6 +1700,71 @@ Data e hora atual: ${agora}.`;
               servicos: { include: { servico: { select: { nome: true } } } },
             },
           });
+        }
+
+        case 'criar_agendamento_recorrente': {
+          const servicoNomes = args.servicoNomes as string[];
+
+          const servicosEncontrados = await this.prisma.servico.findMany({
+            where: {
+              tenantId,
+              ativo: true,
+              nome: { in: servicoNomes, mode: 'insensitive' },
+            },
+            select: { id: true, nome: true },
+          });
+
+          if (servicosEncontrados.length === 0) {
+            return {
+              erro: `Nenhum serviço encontrado com os nomes: ${servicoNomes.join(', ')}. Chame listar_servicos para ver os serviços disponíveis.`,
+            };
+          }
+
+          const servicoIds = servicosEncontrados.map((s) => s.id);
+          const quantidadeSemanas = args.quantidadeSemanas
+            ? Number(args.quantidadeSemanas)
+            : 4;
+
+          const criados = await this.agenda.criarRecorrente(tenantId, {
+            clienteId: str(args.clienteId),
+            petId: str(args.petId),
+            servicoIds,
+            diaDaSemana: Number(args.diaDaSemana),
+            hora: str(args.hora),
+            dataInicio: optStr(args.dataInicio),
+            quantidadeSemanas,
+            modalidade:
+              (args.modalidade as
+                | import('@prisma/client').ModalidadeAgendamento
+                | undefined) ?? 'ClienteTraz',
+            observacoes: optStr(args.observacoes),
+          });
+
+          const diasNomes = [
+            'Domingo',
+            'Segunda',
+            'Terça',
+            'Quarta',
+            'Quinta',
+            'Sexta',
+            'Sábado',
+          ];
+          return {
+            sucesso: true,
+            total: criados.length,
+            diaDaSemana: diasNomes[Number(args.diaDaSemana)],
+            hora: str(args.hora),
+            quantidadeSemanas,
+            cobrancaInfo: `A mensalidade será cobrada automaticamente a cada 4 sessões concluídas.`,
+            primeiroAgendamento: criados[0]
+              ? new Date(criados[0].dataHora).toLocaleDateString('pt-BR')
+              : null,
+            ultimoAgendamento: criados[criados.length - 1]
+              ? new Date(
+                  criados[criados.length - 1].dataHora,
+                ).toLocaleDateString('pt-BR')
+              : null,
+          };
         }
 
         default:

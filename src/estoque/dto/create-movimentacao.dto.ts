@@ -13,7 +13,7 @@ export class CreateMovimentacaoDto {
 
   @ApiProperty()
   @IsNumber()
-  @Min(1)
+  @Min(0.001)
   @Type(() => Number)
   quantidade: number;
 

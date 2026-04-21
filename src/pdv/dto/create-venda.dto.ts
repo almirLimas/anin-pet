@@ -6,7 +6,6 @@ import {
   IsArray,
   ValidateNested,
   Min,
-  IsInt,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
@@ -22,8 +21,8 @@ export class ItemVendaDto {
   nome!: string;
 
   @ApiProperty()
-  @IsInt()
-  @Min(1)
+  @IsNumber()
+  @Min(0.001)
   @Type(() => Number)
   quantidade!: number;
 

@@ -55,18 +55,20 @@ model Tenant {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  usuarios      Usuario[]
-  clientes      Cliente[]
-  pets          Pet[]
-  servicos      Servico[]
-  agendamentos  Agendamento[]
-  lancamentos   Lancamento[]
-  produtos      Produto[]
-  movimentacoes Movimentacao[]
-  vacinas       Vacina[]
-  avaliacoes    AvaliacaoCliente[]
-  vendas        Venda[]
-  itensVenda    ItemVenda[]
+  usuarios         Usuario[]
+  clientes         Cliente[]
+  pets             Pet[]
+  servicos         Servico[]
+  agendamentos     Agendamento[]
+  lancamentos      Lancamento[]
+  produtos         Produto[]
+  movimentacoes    Movimentacao[]
+  vacinas          Vacina[]
+  avaliacoes       AvaliacaoCliente[]
+  vendas           Venda[]
+  itensVenda       ItemVenda[]
+  ordensServico    OrdemServico[]
+  itensOrdemServico ItemOrdemServico[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -191,9 +193,10 @@ model Servico {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
-  tenant       Tenant                @relation(fields: [tenantId], references: [id])
-  agendamentos AgendamentoServico[]
-  itensVenda   ItemVenda[]
+  tenant            Tenant                @relation(fields: [tenantId], references: [id])
+  agendamentos      AgendamentoServico[]
+  itensVenda        ItemVenda[]
+  itensOrdemServico ItemOrdemServico[]
 }
 
 // ── Agenda ───────────────────────────────────────────────────────────────────
@@ -220,18 +223,20 @@ model Agendamento {
   modalidade     ModalidadeAgendamento  @default(ClienteTraz)
   taxaBusca      Decimal?               @db.Decimal(10, 2)
   enderecoBusca  String?
+  recorrenciaId  String?
   clienteId      String
   petId       String
   tenantId    String
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 
-  tenant      Tenant                @relation(fields: [tenantId], references: [id])
-  cliente     Cliente               @relation(fields: [clienteId], references: [id])
-  pet         Pet                   @relation(fields: [petId], references: [id])
-  servicos    AgendamentoServico[]
-  lancamentos Lancamento[]
-  avaliacao   AvaliacaoCliente?
+  tenant       Tenant                @relation(fields: [tenantId], references: [id])
+  cliente      Cliente               @relation(fields: [clienteId], references: [id])
+  pet          Pet                   @relation(fields: [petId], references: [id])
+  servicos     AgendamentoServico[]
+  lancamentos  Lancamento[]
+  avaliacao    AvaliacaoCliente?
+  ordemServico OrdemServico?
 }
 
 model AgendamentoServico {
@@ -242,6 +247,51 @@ model AgendamentoServico {
   servico     Servico     @relation(fields: [servicoId], references: [id])
 
   @@id([agendamentoId, servicoId])
+}
+
+// ── Ordem de Serviço ─────────────────────────────────────────────────────────
+
+enum StatusOrdemServico {
+  Aberta
+  Concluida
+  Cancelada
+}
+
+model OrdemServico {
+  id             String             @id @default(cuid())
+  numero         Int
+  agendamentoId  String             @unique
+  observacoes    String?
+  status         StatusOrdemServico @default(Aberta)
+  formaPagamento FormaPagamento?
+  desconto       Decimal?           @db.Decimal(10, 2)
+  tenantId       String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  agendamento Agendamento      @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  itens       ItemOrdemServico[]
+
+  @@unique([tenantId, numero])
+}
+
+model ItemOrdemServico {
+  id             String        @id @default(cuid())
+  ordemServicoId String
+  tipo           TipoItemVenda
+  nome           String
+  quantidade     Decimal       @default(1) @db.Decimal(10, 3)
+  precoUnitario  Decimal       @db.Decimal(10, 2)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  produtoId      String?
+  servicoId      String?
+  tenantId       String
+
+  ordemServico OrdemServico @relation(fields: [ordemServicoId], references: [id], onDelete: Cascade)
+  produto      Produto?     @relation(fields: [produtoId], references: [id])
+  servico      Servico?     @relation(fields: [servicoId], references: [id])
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
 }
 
 // ── Financeiro ───────────────────────────────────────────────────────────────────────
@@ -261,16 +311,17 @@ enum CategoriaLancamento {
 }
 
 model Lancamento {
-  id            String              @id @default(cuid())
-  tipo          TipoLancamento
-  valor         Decimal             @db.Decimal(10, 2)
-  descricao     String
-  categoria     CategoriaLancamento @default(Outro)
-  data          DateTime            @default(now())
-  agendamentoId String?
-  tenantId      String
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id             String              @id @default(cuid())
+  tipo           TipoLancamento
+  valor          Decimal             @db.Decimal(10, 2)
+  descricao      String
+  categoria      CategoriaLancamento @default(Outro)
+  formaPagamento String?
+  data           DateTime            @default(now())
+  agendamentoId  String?
+  tenantId       String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   agendamento Agendamento? @relation(fields: [agendamentoId], references: [id])
@@ -311,8 +362,10 @@ model Produto {
   unidade         String?
   codigoBarras    String?
   marca           String?
-  quantidadeAtual Int              @default(0)
-  estoqueMinimo   Int              @default(0)
+  granel          Boolean          @default(false)
+  unidadeBase     String?          // ex: "g", "ml", "kg"
+  quantidadeAtual Decimal          @default(0) @db.Decimal(10, 3)
+  estoqueMinimo   Decimal          @default(0) @db.Decimal(10, 3)
   precoCompra     Decimal          @db.Decimal(10, 2)
   precoVenda      Decimal?         @db.Decimal(10, 2)
   descricao       String?
@@ -321,9 +374,10 @@ model Produto {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  movimentacoes Movimentacao[]
-  itensVenda    ItemVenda[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  movimentacoes     Movimentacao[]
+  itensVenda        ItemVenda[]
+  itensOrdemServico ItemOrdemServico[]
 }
 
 enum TipoMovimentacao {
@@ -334,7 +388,7 @@ enum TipoMovimentacao {
 model Movimentacao {
   id            String           @id @default(cuid())
   tipo          TipoMovimentacao
-  quantidade    Int
+  quantidade    Decimal          @db.Decimal(10, 3)
   precoUnitario Decimal?         @db.Decimal(10, 2)
   motivo        String?
   observacoes   String?
@@ -419,7 +473,7 @@ model ItemVenda {
   id            String       @id @default(cuid())
   tipo          TipoItemVenda
   nome          String
-  quantidade    Int
+  quantidade    Decimal      @db.Decimal(10, 3)
   precoUnitario Decimal      @db.Decimal(10, 2)
   subtotal      Decimal      @db.Decimal(10, 2)
   produtoId     String?

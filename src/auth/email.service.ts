@@ -351,4 +351,116 @@ export class EmailService {
       );
     }
   }
+
+  async enviarAlertaAgendamentoConcluido(params: {
+    nomePetshop: string;
+    tenantId: string;
+    nomeCliente: string;
+    nomePet: string;
+    servicos: string;
+    formaPagamento?: string | null;
+    valor: number;
+  }) {
+    const adminEmail = this.config.get<string>(
+      'ADMIN_NOTIFICATION_EMAIL',
+      'josealmirsla@gmail.com',
+    );
+    const {
+      nomePetshop,
+      tenantId,
+      nomeCliente,
+      nomePet,
+      servicos,
+      formaPagamento,
+      valor,
+    } = params;
+    const valorFmt = valor.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+    const dataHora = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    try {
+      await this.enviar(
+        adminEmail,
+        `✅ Agendamento concluído — ${nomePetshop}`,
+        `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+          <h2 style="color:#1d9fb6;">Agendamento concluído 🐾</h2>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:140px;">Petshop</td><td style="padding:6px 0;font-size:14px;font-weight:bold;">${nomePetshop}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Tenant ID</td><td style="padding:6px 0;font-size:13px;color:#9ca3af;">${tenantId}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Cliente</td><td style="padding:6px 0;font-size:14px;">${nomeCliente}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Pet</td><td style="padding:6px 0;font-size:14px;">${nomePet}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Serviços</td><td style="padding:6px 0;font-size:14px;">${servicos}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Pagamento</td><td style="padding:6px 0;font-size:14px;">${formaPagamento ?? '—'}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Valor</td><td style="padding:6px 0;font-size:14px;font-weight:bold;color:#10b981;">${valorFmt}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Horário</td><td style="padding:6px 0;font-size:14px;">${dataHora}</td></tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — notificação interna</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error('Falha ao enviar alerta de agendamento concluído', err);
+    }
+  }
+
+  async enviarAlertaVendaPdv(params: {
+    nomePetshop: string;
+    tenantId: string;
+    numeroPedido: number;
+    itens: string;
+    formaPagamento?: string | null;
+    valor: number;
+    nomeCliente?: string | null;
+  }) {
+    const adminEmail = this.config.get<string>(
+      'ADMIN_NOTIFICATION_EMAIL',
+      'josealmirsla@gmail.com',
+    );
+    const {
+      nomePetshop,
+      tenantId,
+      numeroPedido,
+      itens,
+      formaPagamento,
+      valor,
+      nomeCliente,
+    } = params;
+    const valorFmt = valor.toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    });
+    const dataHora = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    try {
+      await this.enviar(
+        adminEmail,
+        `🛍️ Venda PDV #${numeroPedido} — ${nomePetshop}`,
+        `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+          <h2 style="color:#f07030;">Venda PDV realizada 🛒</h2>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:140px;">Petshop</td><td style="padding:6px 0;font-size:14px;font-weight:bold;">${nomePetshop}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Tenant ID</td><td style="padding:6px 0;font-size:13px;color:#9ca3af;">${tenantId}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Pedido</td><td style="padding:6px 0;font-size:14px;">#${numeroPedido}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Cliente</td><td style="padding:6px 0;font-size:14px;">${nomeCliente ?? 'Não informado'}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Itens</td><td style="padding:6px 0;font-size:14px;">${itens}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Pagamento</td><td style="padding:6px 0;font-size:14px;">${formaPagamento ?? '—'}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Total</td><td style="padding:6px 0;font-size:14px;font-weight:bold;color:#10b981;">${valorFmt}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Horário</td><td style="padding:6px 0;font-size:14px;">${dataHora}</td></tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — notificação interna</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error('Falha ao enviar alerta de venda PDV', err);
+    }
+  }
 }

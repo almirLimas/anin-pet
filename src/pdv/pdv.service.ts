@@ -1,9 +1,11 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../auth/email.service';
 import { CreateVendaDto } from './dto/create-venda.dto';
 import {
   TipoItemVenda,
@@ -13,7 +15,12 @@ import {
 
 @Injectable()
 export class PdvService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(PdvService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly email: EmailService,
+  ) {}
 
   // ─── Buscar próximo número de venda ────────────────────────
 
@@ -65,16 +72,16 @@ export class PdvService {
         const prod = produtos.find((p) => p.id === item.produtoId);
         if (!prod)
           throw new NotFoundException(`Produto "${item.nome}" não encontrado`);
-        if (prod.quantidadeAtual < item.quantidade) {
+        if (Number(prod.quantidadeAtual) < item.quantidade) {
           throw new BadRequestException(
-            `Estoque insuficiente para "${prod.nome}": disponível ${prod.quantidadeAtual}, solicitado ${item.quantidade}`,
+            `Estoque insuficiente para "${prod.nome}": disponível ${Number(prod.quantidadeAtual)}, solicitado ${item.quantidade}`,
           );
         }
       }
     }
 
     // Transação: criar venda + baixar estoque + lançamento financeiro
-    return this.prisma.$transaction(async (tx) => {
+    const venda = await this.prisma.$transaction(async (tx) => {
       // 1) Criar a venda
       const venda = await tx.venda.create({
         data: {
@@ -129,18 +136,69 @@ export class PdvService {
       }
 
       // 3) Registrar receita no financeiro
+      const nomesItens = itensComSubtotal
+        .map((i) =>
+          i.quantidade !== 1 ? `${i.nome} (×${i.quantidade})` : i.nome,
+        )
+        .join(', ');
       await tx.lancamento.create({
         data: {
           tipo: TipoLancamento.Receita,
           valor: valorTotal,
-          descricao: `Venda PDV #${numero}`,
+          descricao: `PDV #${numero} — ${nomesItens}`,
           categoria: CategoriaLancamento.Produto,
+          formaPagamento: dto.formaPagamento ?? null,
           tenantId,
         },
       });
 
       return venda;
     });
+
+    const nomesItensAlerta = itensComSubtotal
+      .map((i) =>
+        i.quantidade === 1 ? i.nome : `${i.nome} (×${i.quantidade})`,
+      )
+      .join(', ');
+    void this.enviarAlertaVenda(
+      tenantId,
+      numero,
+      nomesItensAlerta,
+      valorTotal,
+      dto.formaPagamento ?? null,
+      venda.cliente?.nome ?? null,
+    );
+
+    return venda;
+  }
+
+  private async enviarAlertaVenda(
+    tenantId: string,
+    numeroPedido: number,
+    itens: string,
+    valor: number,
+    formaPagamento: string | null | undefined,
+    nomeCliente: string | null | undefined,
+  ) {
+    const tenant = await this.prisma.tenant
+      .findUnique({ where: { id: tenantId }, select: { nome: true } })
+      .catch(() => null);
+    this.email
+      .enviarAlertaVendaPdv({
+        nomePetshop: tenant?.nome ?? tenantId,
+        tenantId,
+        numeroPedido,
+        itens,
+        formaPagamento: formaPagamento ?? null,
+        valor,
+        nomeCliente: nomeCliente ?? null,
+      })
+      .catch((err: unknown) =>
+        this.logger.error(
+          '[Admin] Falha ao enviar alerta de venda PDV',
+          String(err),
+        ),
+      );
   }
 
   // ─── Listar vendas ──────────────────────────────────────────

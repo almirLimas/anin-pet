@@ -15,6 +15,7 @@ import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { AgendaService } from './agenda.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
+import { CreateAgendamentoRecorrenteDto } from './dto/create-agendamento-recorrente.dto';
 
 @ApiTags('Agenda')
 @ApiBearerAuth()
@@ -53,6 +54,14 @@ export class AgendaController {
     @Body() dto: CreateAgendamentoDto,
   ) {
     return this.agendaService.create(usuario.tenantId, dto);
+  }
+
+  @Post('recorrente')
+  criarRecorrente(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: CreateAgendamentoRecorrenteDto,
+  ) {
+    return this.agendaService.criarRecorrente(usuario.tenantId, dto);
   }
 
   @Patch(':id')

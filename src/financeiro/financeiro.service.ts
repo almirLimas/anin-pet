@@ -84,6 +84,7 @@ export class FinanceiroService {
         valor: dto.valor,
         descricao: dto.descricao,
         categoria: dto.categoria ?? 'Outro',
+        formaPagamento: dto.formaPagamento ?? null,
         data: dto.data ? new Date(`${dto.data}T12:00:00.000Z`) : new Date(),
         agendamentoId: dto.agendamentoId ?? null,
         tenantId,

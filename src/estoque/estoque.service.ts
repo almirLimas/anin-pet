@@ -75,8 +75,8 @@ export class EstoqueService {
 
     const novaQuantidade =
       dto.tipo === 'Entrada'
-        ? produto.quantidadeAtual + dto.quantidade
-        : produto.quantidadeAtual - dto.quantidade;
+        ? Number(produto.quantidadeAtual) + dto.quantidade
+        : Number(produto.quantidadeAtual) - dto.quantidade;
 
     if (novaQuantidade < 0) {
       throw new BadRequestException('Quantidade insuficiente em estoque');

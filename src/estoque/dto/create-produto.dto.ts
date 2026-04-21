@@ -1,4 +1,11 @@
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { CategoriaEstoque } from '@prisma/client';
@@ -31,6 +38,18 @@ export class CreateProdutoDto {
   @IsOptional()
   @IsString()
   unidade?: string;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  granel?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Unidade de base para produtos a granel (ex: g, ml, kg)',
+  })
+  @IsOptional()
+  @IsString()
+  unidadeBase?: string;
 
   @ApiProperty()
   @IsNumber()

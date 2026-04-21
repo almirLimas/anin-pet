@@ -58,4 +58,12 @@ export class CreateAgendamentoDto {
   @IsOptional()
   @IsString()
   enderecoBusca?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Forma de pagamento ao concluir (Dinheiro, Pix, Cartao_Debito, Cartao_Credito)',
+  })
+  @IsOptional()
+  @IsString()
+  formaPagamento?: string;
 }

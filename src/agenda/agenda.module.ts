@@ -11,5 +11,6 @@ import { AvaliacoesModule } from '../avaliacoes/avaliacoes.module';
   imports: [FinanceiroModule, WhatsappModule, AuthModule, AvaliacoesModule],
   controllers: [AgendaController],
   providers: [AgendaService, AgendaCronService],
+  exports: [AgendaService],
 })
 export class AgendaModule {}

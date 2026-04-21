@@ -33,4 +33,8 @@ export class CreateLancamentoDto {
   @IsOptional()
   @IsString()
   agendamentoId?: string;
+
+  @IsOptional()
+  @IsString()
+  formaPagamento?: string;
 }
