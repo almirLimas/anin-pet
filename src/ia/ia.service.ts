@@ -1517,7 +1517,7 @@ Data e hora atual: ${agora}.`;
             produtos: resultado.map((p) => ({
               nome: p.nome,
               categoria: p.categoria,
-              estoque: `${p.quantidadeAtual} ${p.unidade ?? 'un'}`,
+              estoque: `${Number(p.quantidadeAtual)} ${p.unidade ?? 'un'}`,
               estoqueMinimo: p.estoqueMinimo,
               alerta:
                 p.quantidadeAtual <= p.estoqueMinimo

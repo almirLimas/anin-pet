@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +18,7 @@ import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarDto } from './dto/registrar.dto';
+import { CriarStaffDto } from './dto/criar-staff.dto';
 import { EmailService } from './email.service';
 
 @Injectable()
@@ -321,6 +324,107 @@ export class AuthService {
     });
 
     return { mensagem: 'Senha redefinida com sucesso.' };
+  }
+
+  async criarStaff(adminId: string, dto: CriarStaffDto) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true, perfil: true },
+    });
+
+    if (admin.perfil !== 'admin') {
+      throw new ForbiddenException(
+        'Apenas administradores podem criar funcionários',
+      );
+    }
+
+    const totalStaff = await this.prisma.usuario.count({
+      where: { tenantId: admin.tenantId, perfil: { not: 'admin' } },
+    });
+
+    if (totalStaff >= 3) {
+      throw new BadRequestException('Limite de 3 funcionários atingido');
+    }
+
+    const existe = await this.prisma.usuario.findUnique({
+      where: { email: dto.email },
+    });
+    if (existe) throw new ConflictException('E-mail já cadastrado');
+
+    const senhaHash = await bcrypt.hash(dto.senha, 10);
+
+    const usuario = await this.prisma.usuario.create({
+      data: {
+        nomeCompleto: dto.nomeCompleto,
+        email: dto.email,
+        telefone: dto.telefone,
+        senhaHash,
+        perfil: dto.perfil as any,
+        tenantId: admin.tenantId,
+      },
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+        perfil: true,
+        telefone: true,
+      },
+    });
+
+    return usuario;
+  }
+
+  async listarStaff(adminId: string) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true, perfil: true },
+    });
+
+    if (admin.perfil !== 'admin') {
+      throw new ForbiddenException(
+        'Apenas administradores podem listar funcionários',
+      );
+    }
+
+    return this.prisma.usuario.findMany({
+      where: { tenantId: admin.tenantId, perfil: { not: 'admin' } },
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+        perfil: true,
+        telefone: true,
+        status: true,
+      },
+      orderBy: { nomeCompleto: 'asc' },
+    });
+  }
+
+  async removerStaff(adminId: string, staffId: string) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true, perfil: true },
+    });
+
+    if (admin.perfil !== 'admin') {
+      throw new ForbiddenException(
+        'Apenas administradores podem remover funcionários',
+      );
+    }
+
+    const staff = await this.prisma.usuario.findFirst({
+      where: {
+        id: staffId,
+        tenantId: admin.tenantId,
+        perfil: { not: 'admin' },
+      },
+    });
+
+    if (!staff) throw new NotFoundException('Funcionário não encontrado');
+
+    await this.prisma.usuario.delete({ where: { id: staffId } });
+
+    return { removido: true };
   }
 
   private validarCpf(digits: string): boolean {

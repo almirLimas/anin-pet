@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Patch,
   Post,
   Request,
@@ -12,6 +14,7 @@ import { AuthService } from './auth.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
+import { CriarStaffDto } from './dto/criar-staff.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -90,5 +93,37 @@ export class AuthController {
   })
   redefinirSenha(@Body() dto: RedefinirSenhaDto) {
     return this.authService.redefinirSenha(dto);
+  }
+
+  @Post('staff')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Cadastra um funcionário no petshop (máx. 3). Apenas admin.',
+  })
+  criarStaff(
+    @Request() req: { user: { id: string } },
+    @Body() dto: CriarStaffDto,
+  ) {
+    return this.authService.criarStaff(req.user.id, dto);
+  }
+
+  @Get('staff')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lista os funcionários do petshop. Apenas admin.' })
+  listarStaff(@Request() req: { user: { id: string } }) {
+    return this.authService.listarStaff(req.user.id);
+  }
+
+  @Delete('staff/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove um funcionário do petshop. Apenas admin.' })
+  removerStaff(
+    @Request() req: { user: { id: string } },
+    @Param('id') staffId: string,
+  ) {
+    return this.authService.removerStaff(req.user.id, staffId);
   }
 }
