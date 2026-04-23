@@ -68,10 +68,11 @@ model Tenant {
   movimentacoes    Movimentacao[]
   vacinas          Vacina[]
   avaliacoes       AvaliacaoCliente[]
-  vendas           Venda[]
-  itensVenda       ItemVenda[]
-  ordensServico    OrdemServico[]
+  vendas            Venda[]
+  itensVenda        ItemVenda[]
+  ordensServico     OrdemServico[]
   itensOrdemServico ItemOrdemServico[]
+  fechamentosCaixa  FechamentoCaixa[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -91,7 +92,8 @@ model Usuario {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  fechamentos     FechamentoCaixa[]
 }
 
 // ── Clientes ─────────────────────────────────────────────────────────────────
@@ -488,4 +490,30 @@ model ItemVenda {
   produto Produto? @relation(fields: [produtoId], references: [id])
   servico Servico? @relation(fields: [servicoId], references: [id])
   tenant  Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+// ── Fechamento de Caixa ────────────────────────────────────────────────────
+
+model FechamentoCaixa {
+  id                   String   @id @default(cuid())
+  data                 DateTime @db.Date
+  totalVendas          Decimal  @db.Decimal(10, 2)
+  quantidadeVendas     Int
+  porFormaPagamento    Json
+  // Breakdown por fonte
+  totalPdv             Decimal? @db.Decimal(10, 2)
+  qtdPdv               Int?
+  porFormaPdv          Json?
+  totalAgendamentos    Decimal? @db.Decimal(10, 2)
+  qtdAgendamentos      Int?
+  porFormaAgendamentos Json?
+  observacoes          String?
+  usuarioId            String
+  tenantId             String
+  criadoEm             DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@unique([tenantId, data])
 }

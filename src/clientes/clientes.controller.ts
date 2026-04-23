@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { ClientesService } from './clientes.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
@@ -75,6 +77,8 @@ export class ClientesController {
   }
 
   @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'gerente')
   remove(
     @UsuarioAtual() usuario: { tenantId: string },
     @Param('id') id: string,

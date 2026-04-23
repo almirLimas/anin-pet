@@ -307,9 +307,11 @@ export class PdvService {
   // ─── Resumo do dia ───────────────────────────────────────────
 
   async resumoDia(tenantId: string, data?: string) {
-    const dia = data ?? new Date().toISOString().split('T')[0];
-    const inicio = new Date(`${dia}T00:00:00.000Z`);
-    const fim = new Date(`${dia}T23:59:59.999Z`);
+    const dia =
+      data ??
+      new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const inicio = new Date(`${dia}T00:00:00-03:00`);
+    const fim = new Date(`${dia}T23:59:59.999-03:00`);
 
     const vendas = await this.prisma.venda.findMany({
       where: {
