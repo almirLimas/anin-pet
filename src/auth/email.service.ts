@@ -463,4 +463,58 @@ export class EmailService {
       this.logger.error('Falha ao enviar alerta de venda PDV', err);
     }
   }
+
+  async enviarAlertaErro(params: {
+    metodo: string;
+    url: string;
+    status: number;
+    mensagem: string;
+    stack?: string;
+  }) {
+    const alertEmail = this.config.get<string>('ALERT_EMAIL');
+    if (!alertEmail) return;
+
+    const { metodo, url, status, mensagem, stack } = params;
+    const dataHora = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    const stackHtml = stack
+      ? `<pre style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;font-size:11px;overflow:auto;color:#374151;">${stack.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</pre>`
+      : '';
+
+    try {
+      await this.enviar(
+        alertEmail,
+        `🚨 Erro ${status} em produção — AninPet`,
+        `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+          <h2 style="color:#dc2626;">🚨 Erro ${status} detectado em produção</h2>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+            <tr style="background:#fef2f2;">
+              <td style="padding:8px 12px;color:#6b7280;font-size:14px;width:120px;">Status</td>
+              <td style="padding:8px 12px;font-size:14px;font-weight:bold;color:#dc2626;">${status}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;color:#6b7280;font-size:14px;">Rota</td>
+              <td style="padding:8px 12px;font-size:14px;font-family:monospace;">${metodo} ${url}</td>
+            </tr>
+            <tr style="background:#fef2f2;">
+              <td style="padding:8px 12px;color:#6b7280;font-size:14px;">Mensagem</td>
+              <td style="padding:8px 12px;font-size:14px;">${mensagem}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;color:#6b7280;font-size:14px;">Horário</td>
+              <td style="padding:8px 12px;font-size:14px;">${dataHora}</td>
+            </tr>
+          </table>
+          ${stackHtml}
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — alerta automático de erro em produção</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error('Falha ao enviar alerta de erro', err);
+    }
+  }
 }
