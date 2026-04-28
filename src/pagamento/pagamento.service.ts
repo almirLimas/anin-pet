@@ -13,7 +13,7 @@ import { EmailService } from '../auth/email.service';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
 
 const PRECO_PLANO: Record<Plano, number> = {
-  basico: 79,
+  basico: 49.9,
   plus: 109,
   profissional: 109,
   completo: 129,

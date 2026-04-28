@@ -22,6 +22,7 @@ import { PdvModule } from './pdv/pdv.module';
 import { IaModule } from './ia/ia.module';
 import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
 import { FechamentoModule } from './fechamento/fechamento.module';
+import { NpsModule } from './nps/nps.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { FechamentoModule } from './fechamento/fechamento.module';
     IaModule,
     OrdemServicoModule,
     FechamentoModule,
+    NpsModule,
   ],
   providers: [
     {

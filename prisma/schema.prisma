@@ -73,6 +73,7 @@ model Tenant {
   ordensServico     OrdemServico[]
   itensOrdemServico ItemOrdemServico[]
   fechamentosCaixa  FechamentoCaixa[]
+  feedbacksNPS      FeedbackNPS[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -516,4 +517,18 @@ model FechamentoCaixa {
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 
   @@unique([tenantId, data])
+}
+
+// ── NPS (feedback dos donos de petshop sobre o AninPet) ──────────────────────
+
+model FeedbackNPS {
+  id          String   @id @default(cuid())
+  tenantId    String
+  nota        Int
+  comentario  String?
+  token       String   @unique
+  respondidoEm DateTime?
+  enviadoEm   DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 }

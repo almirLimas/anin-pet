@@ -464,6 +464,62 @@ export class EmailService {
     }
   }
 
+  async enviarNPS(params: {
+    email: string;
+    nomeAdmin: string;
+    nomePetshop: string;
+    linkBase: string;
+    token: string;
+  }) {
+    const { email, nomeAdmin, nomePetshop, linkBase, token } = params;
+
+    const opcoes = [
+      { nota: 1, emoji: '😞', label: 'Muito ruim' },
+      { nota: 2, emoji: '😕', label: 'Ruim' },
+      { nota: 3, emoji: '😐', label: 'Regular' },
+      { nota: 4, emoji: '🙂', label: 'Bom' },
+      { nota: 5, emoji: '😍', label: 'Excelente' },
+    ];
+
+    const botoes = opcoes
+      .map(
+        ({ nota, emoji, label }) =>
+          `<a href="${linkBase}/nps/responder?token=${token}&nota=${nota}"
+             style="display:inline-block;margin:0 5px;padding:12px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;text-decoration:none;text-align:center;min-width:58px;">
+            <div style="font-size:26px;line-height:1;">${emoji}</div>
+            <div style="font-size:11px;color:#6b7280;margin-top:4px;">${label}</div>
+          </a>`,
+      )
+      .join('');
+
+    try {
+      await this.enviar(
+        email,
+        `${nomeAdmin}, como está sendo sua experiência com o AninPet? 🐾`,
+        `
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
+          <h2 style="color:#1d9fb6;">Oi, ${nomeAdmin}! Tudo bem? 👋</h2>
+          <p>
+            Você usa o <strong>AninPet</strong> no <strong>${nomePetshop}</strong> há alguns dias e
+            adoraríamos saber o que você está achando.
+          </p>
+          <p style="font-weight:bold;margin-bottom:8px;">Como você avalia o AninPet até agora?</p>
+          <div style="text-align:center;margin:24px 0;">
+            ${botoes}
+          </div>
+          <p style="color:#6b7280;font-size:13px;">
+            Clique em uma nota acima. Leva menos de 10 segundos e nos ajuda muito a melhorar o sistema para você! 🙏
+          </p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error(`Falha ao enviar NPS para ${email}`, err);
+    }
+  }
+
   async enviarAlertaErro(params: {
     metodo: string;
     url: string;
