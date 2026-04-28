@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,13 +16,14 @@ export class NpsService {
   ) {}
 
   /**
-   * Roda todo dia às 10h.
+   * Dispara diariamente às 12h (horário de Brasília).
    * Envia NPS para tenants ativos que:
    *  - Criaram conta há 7 dias (primeiro envio)
    *  - Ou completaram 30 dias desde o último feedback enviado
    */
-  @Cron(CronExpression.EVERY_DAY_AT_NOON)
+  @Cron('15 16 * * *', { timeZone: 'America/Sao_Paulo' })
   async dispararNPS() {
+    this.logger.log('[NPS] Cron iniciado');
     const agora = new Date();
     const sete = new Date(agora);
     sete.setDate(sete.getDate() - 7);
@@ -81,8 +82,13 @@ export class NpsService {
         token,
       });
 
-      this.logger.log(`NPS enviado para tenant ${tenant.id} (${tenant.nome})`);
+      this.logger.log(
+        `[NPS] Enviado para tenant ${tenant.id} (${tenant.nome}) — ${admin.email}`,
+      );
     }
+    this.logger.log(
+      `[NPS] Cron finalizado — ${tenants.length} tenant(s) elegível(is), ${tenants.filter((t) => t.usuarios[0]).length} e-mail(s) enviado(s)`,
+    );
   }
 
   async responder(token: string, nota: number, comentario?: string) {

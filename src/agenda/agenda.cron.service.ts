@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { AssinaturaStatus, StatusAgendamento } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,8 +15,9 @@ export class AgendaCronService {
     private readonly config: ConfigService,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_10AM)
+  @Cron('0 15 * * *', { timeZone: 'America/Sao_Paulo' }) // 12h (meio-dia) horário de Brasília
   async enviarLembretesRetorno() {
+    this.logger.log('[LembreteRetorno] Cron iniciado');
     const diasSemVisita = this.config.get<number>('LEMBRETE_RETORNO_DIAS', 30);
 
     const limiteData = new Date();
@@ -84,11 +85,10 @@ export class AgendaCronService {
         enviados++;
       }
 
-      if (enviados > 0) {
-        this.logger.log(
-          `[${tenant.nome}] ${enviados} lembrete(s) de retorno enviado(s)`,
-        );
-      }
+      this.logger.log(
+        `[${tenant.nome}] ${enviados} lembrete(s) de retorno enviado(s) (${clientes.length} cliente(s) elegíveis)`,
+      );
     }
+    this.logger.log('[LembreteRetorno] Cron finalizado');
   }
 }
