@@ -90,13 +90,13 @@ export class AgendaService {
       include: this.include,
     });
 
-    // Notificação WhatsApp ao cliente (somente plano Plus)
+    // Notificação WhatsApp ao cliente
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { plano: true },
+      select: { mensagemAgendamento: true },
     });
     const telefone = agendamento.cliente.telefonePrincipal;
-    if (telefone && tenant?.plano === 'plus') {
+    if (telefone) {
       const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -109,12 +109,16 @@ export class AgendaService {
       const nomesServicos = agendamento.servicos
         .map((s) => s.servico.nome)
         .join(', ');
-      const mensagem =
-        `Olá, ${agendamento.cliente.nome}! 🐾 Seu agendamento foi confirmado.\n` +
-        `Pet: ${agendamento.pet.nome}\n` +
-        `Serviço: ${nomesServicos}\n` +
-        `Data: ${dataFormatada} às ${horaFormatada}\n` +
-        `Até lá! 😊`;
+
+      const templatePadrao =
+        'Olá, {nome}! 🐾 Seu agendamento para {pet} foi confirmado.\nServiço: {servico}\nData: {data} às {hora}\nAté lá! 😊';
+
+      const mensagem = (tenant?.mensagemAgendamento ?? templatePadrao)
+        .replaceAll('{nome}', agendamento.cliente.nome)
+        .replaceAll('{pet}', agendamento.pet.nome)
+        .replaceAll('{servico}', nomesServicos)
+        .replaceAll('{data}', dataFormatada)
+        .replaceAll('{hora}', horaFormatada);
 
       this.whatsapp
         .enviar(
@@ -239,17 +243,17 @@ export class AgendaService {
         );
       }
 
-      // Dispara pesquisa de satisfação por e-mail (se cliente tiver e-mail)
+      // Dispara pesquisa de satisfação por WhatsApp (ou e-mail como fallback)
       const clienteCompleto = await this.prisma.cliente.findUnique({
         where: { id: atualizado.cliente.id },
-        select: { email: true },
+        select: { email: true, telefonePrincipal: true },
       });
 
       this.logger.log(
         `[Satisfação] Agendamento ${id} concluído — e-mail do cliente: ${clienteCompleto?.email ?? 'NÃO CADASTRADO'}`,
       );
 
-      if (clienteCompleto?.email) {
+      if (clienteCompleto?.email || clienteCompleto?.telefonePrincipal) {
         const jaTemAvaliacao = await this.prisma.avaliacaoCliente.findUnique({
           where: { agendamentoId: id },
         });
@@ -261,7 +265,7 @@ export class AgendaService {
         } else {
           const tenant = await this.prisma.tenant.findUnique({
             where: { id: tenantId },
-            select: { nome: true },
+            select: { nome: true, mensagemAvaliacao: true },
           });
           const token = await this.avaliacoes.criarPendente(
             id,
@@ -274,23 +278,63 @@ export class AgendaService {
             .trim()
             .replace(/\/$/, '');
           const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
-          this.logger.log(
-            `[Satisfação] Enviando e-mail para ${clienteCompleto.email} — link: ${linkAvaliacao}`,
-          );
-          this.email
-            .enviarPesquisaSatisfacao(
-              clienteCompleto.email,
-              atualizado.cliente.nome,
-              atualizado.pet.nome,
-              atualizado.servicos[0]?.servico.nome ?? 'Serviço',
-              tenant?.nome ?? 'Petshop',
-              linkAvaliacao,
-            )
-            .catch((err: unknown) =>
-              this.logger.error(
-                `[Satisfação] Falha ao enviar e-mail para ${clienteCompleto.email}: ${String(err)}`,
-              ),
+
+          // Tenta WhatsApp primeiro
+          if (clienteCompleto.telefonePrincipal) {
+            const templateAvaliacao =
+              tenant?.mensagemAvaliacao ??
+              'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}';
+            const mensagemWpp = templateAvaliacao
+              .replaceAll('{nome}', atualizado.cliente.nome)
+              .replaceAll('{pet}', atualizado.pet.nome)
+              .replaceAll('{link}', linkAvaliacao);
+            this.whatsapp
+              .enviar(
+                {
+                  telefone: clienteCompleto.telefonePrincipal,
+                  mensagem: mensagemWpp,
+                  nomeCliente: atualizado.cliente.nome,
+                },
+                tenantId,
+              )
+              .then((res) => {
+                if (!res.sucesso && clienteCompleto.email) {
+                  // WhatsApp falhou — tenta e-mail como fallback
+                  return this.email.enviarPesquisaSatisfacao(
+                    clienteCompleto.email,
+                    atualizado.cliente.nome,
+                    atualizado.pet.nome,
+                    atualizado.servicos[0]?.servico.nome ?? 'Serviço',
+                    tenant?.nome ?? 'Petshop',
+                    linkAvaliacao,
+                  );
+                }
+              })
+              .catch((err: unknown) =>
+                this.logger.error(
+                  `[Satisfação] Falha ao enviar para ${atualizado.cliente.nome}: ${String(err)}`,
+                ),
+              );
+          } else if (clienteCompleto.email) {
+            // Sem telefone — usa e-mail
+            this.logger.log(
+              `[Satisfação] Enviando e-mail para ${clienteCompleto.email} — link: ${linkAvaliacao}`,
             );
+            this.email
+              .enviarPesquisaSatisfacao(
+                clienteCompleto.email,
+                atualizado.cliente.nome,
+                atualizado.pet.nome,
+                atualizado.servicos[0]?.servico.nome ?? 'Serviço',
+                tenant?.nome ?? 'Petshop',
+                linkAvaliacao,
+              )
+              .catch((err: unknown) =>
+                this.logger.error(
+                  `[Satisfação] Falha ao enviar e-mail para ${clienteCompleto.email}: ${String(err)}`,
+                ),
+              );
+          }
         }
       }
 

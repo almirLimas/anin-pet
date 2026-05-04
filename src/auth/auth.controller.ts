@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
 import { CriarStaffDto } from './dto/criar-staff.dto';
+import { AtualizarStaffDto } from './dto/atualizar-staff.dto';
+import { AtualizarMensagemWhatsappDto } from './dto/atualizar-mensagem-whatsapp.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -95,11 +98,20 @@ export class AuthController {
     return this.authService.redefinirSenha(dto);
   }
 
+  @Get('verificar-email')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verifica se um e-mail já está em uso' })
+  verificarEmail(@Query('email') email: string) {
+    return this.authService.verificarEmail(email);
+  }
+
   @Post('staff')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Cadastra um funcionário no petshop (máx. 3). Apenas admin.',
+    summary:
+      'Cadastra um funcionário no petshop (máx. 3 básico / 5 plus). Apenas admin.',
   })
   criarStaff(
     @Request() req: { user: { id: string } },
@@ -116,6 +128,20 @@ export class AuthController {
     return this.authService.listarStaff(req.user.id);
   }
 
+  @Patch('staff/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Atualiza um funcionário do petshop. Apenas admin.',
+  })
+  atualizarStaff(
+    @Request() req: { user: { id: string } },
+    @Param('id') staffId: string,
+    @Body() dto: AtualizarStaffDto,
+  ) {
+    return this.authService.atualizarStaff(req.user.id, staffId, dto);
+  }
+
   @Delete('staff/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -125,5 +151,26 @@ export class AuthController {
     @Param('id') staffId: string,
   ) {
     return this.authService.removerStaff(req.user.id, staffId);
+  }
+
+  @Get('whatsapp-config')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retorna a mensagem de agendamento configurada' })
+  buscarMensagemWhatsapp(@Request() req: { user: { id: string } }) {
+    return this.authService.buscarMensagemWhatsapp(req.user.id);
+  }
+
+  @Patch('whatsapp-config')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Atualiza a mensagem de confirmação de agendamento',
+  })
+  atualizarMensagemWhatsapp(
+    @Request() req: { user: { id: string } },
+    @Body() dto: AtualizarMensagemWhatsappDto,
+  ) {
+    return this.authService.atualizarMensagemWhatsapp(req.user.id, dto);
   }
 }

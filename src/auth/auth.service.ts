@@ -19,6 +19,7 @@ import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { RegistrarDto } from './dto/registrar.dto';
 import { CriarStaffDto } from './dto/criar-staff.dto';
+import { AtualizarStaffDto } from './dto/atualizar-staff.dto';
 import { EmailService } from './email.service';
 
 @Injectable()
@@ -329,7 +330,11 @@ export class AuthService {
   async criarStaff(adminId: string, dto: CriarStaffDto) {
     const admin = await this.prisma.usuario.findUniqueOrThrow({
       where: { id: adminId },
-      select: { tenantId: true, perfil: true },
+      select: {
+        tenantId: true,
+        perfil: true,
+        tenant: { select: { plano: true } },
+      },
     });
 
     if (admin.perfil !== 'admin') {
@@ -338,12 +343,16 @@ export class AuthService {
       );
     }
 
+    const limiteStaff = admin.tenant.plano === 'plus' ? 5 : 3;
+
     const totalStaff = await this.prisma.usuario.count({
       where: { tenantId: admin.tenantId, perfil: { not: 'admin' } },
     });
 
-    if (totalStaff >= 3) {
-      throw new BadRequestException('Limite de 3 funcionários atingido');
+    if (totalStaff >= limiteStaff) {
+      throw new BadRequestException(
+        `Limite de ${limiteStaff} funcionários atingido para o plano ${admin.tenant.plano}`,
+      );
     }
 
     const existe = await this.prisma.usuario.findUnique({
@@ -374,6 +383,14 @@ export class AuthService {
     return usuario;
   }
 
+  async verificarEmail(email: string) {
+    const existe = await this.prisma.usuario.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    return { disponivel: !existe };
+  }
+
   async listarStaff(adminId: string) {
     const admin = await this.prisma.usuario.findUniqueOrThrow({
       where: { id: adminId },
@@ -397,6 +414,51 @@ export class AuthService {
         status: true,
       },
       orderBy: { nomeCompleto: 'asc' },
+    });
+  }
+
+  async atualizarStaff(
+    adminId: string,
+    staffId: string,
+    dto: AtualizarStaffDto,
+  ) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true, perfil: true },
+    });
+
+    if (admin.perfil !== 'admin')
+      throw new ForbiddenException(
+        'Apenas administradores podem editar funcionários',
+      );
+
+    const staffMember = await this.prisma.usuario.findFirst({
+      where: {
+        id: staffId,
+        tenantId: admin.tenantId,
+        perfil: { not: 'admin' },
+      },
+    });
+
+    if (!staffMember) throw new NotFoundException('Funcionário não encontrado');
+
+    const data: Record<string, unknown> = {};
+    if (dto.nomeCompleto) data.nomeCompleto = dto.nomeCompleto;
+    if (dto.telefone !== undefined) data.telefone = dto.telefone;
+    if (dto.perfil) data.perfil = dto.perfil;
+    if (dto.novaSenha) data.senhaHash = await bcrypt.hash(dto.novaSenha, 10);
+
+    return this.prisma.usuario.update({
+      where: { id: staffId },
+      data,
+      select: {
+        id: true,
+        nomeCompleto: true,
+        email: true,
+        perfil: true,
+        telefone: true,
+        status: true,
+      },
     });
   }
 
@@ -425,6 +487,52 @@ export class AuthService {
     await this.prisma.usuario.delete({ where: { id: staffId } });
 
     return { removido: true };
+  }
+
+  async buscarMensagemWhatsapp(adminId: string) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true },
+    });
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: admin.tenantId },
+      select: { mensagemAgendamento: true, mensagemAvaliacao: true },
+    });
+    return {
+      mensagem:
+        tenant.mensagemAgendamento ??
+        'Olá, {nome}! 🐾 Seu agendamento para {pet} foi confirmado.\nServiço: {servico}\nData: {data} às {hora}\nAté lá! 😊',
+      mensagemAvaliacao:
+        tenant.mensagemAvaliacao ??
+        'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}',
+    };
+  }
+
+  async atualizarMensagemWhatsapp(
+    adminId: string,
+    dto: { mensagem?: string; mensagemAvaliacao?: string },
+  ) {
+    const admin = await this.prisma.usuario.findUniqueOrThrow({
+      where: { id: adminId },
+      select: { tenantId: true, perfil: true },
+    });
+    if (admin.perfil !== 'admin') {
+      throw new ForbiddenException(
+        'Apenas administradores podem alterar essa configuração',
+      );
+    }
+    await this.prisma.tenant.update({
+      where: { id: admin.tenantId },
+      data: {
+        ...(dto.mensagem !== undefined && {
+          mensagemAgendamento: dto.mensagem,
+        }),
+        ...(dto.mensagemAvaliacao !== undefined && {
+          mensagemAvaliacao: dto.mensagemAvaliacao,
+        }),
+      },
+    });
+    return { atualizado: true };
   }
 
   private validarCpf(digits: string): boolean {

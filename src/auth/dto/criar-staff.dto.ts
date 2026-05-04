@@ -11,6 +11,7 @@ export enum PerfilStaff {
   gerente = 'gerente',
   atendente = 'atendente',
   caixa = 'caixa',
+  motoboy = 'motoboy',
 }
 
 export class CriarStaffDto {
@@ -29,7 +30,7 @@ export class CriarStaffDto {
 
   @ApiProperty({ enum: PerfilStaff, example: 'caixa' })
   @IsEnum(PerfilStaff, {
-    message: 'Perfil inválido. Use gerente, atendente ou caixa',
+    message: 'Perfil inválido. Use gerente, atendente, caixa ou motoboy',
   })
   perfil: PerfilStaff;
 

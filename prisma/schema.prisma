@@ -18,6 +18,7 @@ enum Perfil {
   atendente
   caixa
   staff
+  motoboy
 }
 
 enum StatusUsuario {
@@ -53,10 +54,12 @@ model Tenant {
   avisoTrial1dEnviadoEm DateTime?
   mpAssinaturaId   String?
   mpPagamentoId    String?
-  metaMensal       Decimal?         @db.Decimal(10, 2)
-  taxaBusca        Decimal?         @db.Decimal(10, 2)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  metaMensal            Decimal?  @db.Decimal(10, 2)
+  taxaBusca             Decimal?  @db.Decimal(10, 2)
+  mensagemAgendamento   String?
+  mensagemAvaliacao     String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   usuarios         Usuario[]
   clientes         Cliente[]

@@ -88,7 +88,7 @@ export class WhatsappService {
     }
 
     if (this.modo === 'evolution') {
-      return this._enviarEvolution(numero, dto.mensagem, agora);
+      return this._enviarEvolution(numero, dto.mensagem, agora, tenantId);
     }
 
     // ── MODO SIMULAÇÃO (padrão) ───────────────────────────────────────────
@@ -202,9 +202,11 @@ export class WhatsappService {
     numero: string,
     mensagem: string,
     agora: string,
+    tenantId?: string,
   ): Promise<ResultadoEnvio> {
     try {
-      const url = `${this.evolutionUrl}/message/sendText/${this.evolutionInstance}`;
+      const instancia = tenantId ?? this.evolutionInstance;
+      const url = `${this.evolutionUrl}/message/sendText/${instancia}`;
 
       const res = await fetch(url, {
         method: 'POST',
@@ -231,7 +233,9 @@ export class WhatsappService {
         };
       }
 
-      this.logger.log(`[Evolution] Mensagem enviada para +${numero}`);
+      this.logger.log(
+        `[Evolution] Mensagem enviada para +${numero} (instancia: ${instancia})`,
+      );
       return {
         sucesso: true,
         simulado: false,
@@ -251,5 +255,111 @@ export class WhatsappService {
         detalhes: msg,
       };
     }
+  }
+
+  // ── Evolution: status / conectar / desconectar ────────────────────────────
+
+  get modoAtual() {
+    return this.modo;
+  }
+
+  async evolutionStatus(tenantId: string): Promise<{
+    status: string;
+    qrDataUrl?: string;
+  }> {
+    const instancia = tenantId ?? this.evolutionInstance;
+    try {
+      const res = await fetch(
+        `${this.evolutionUrl}/instance/connectionState/${instancia}`,
+        { headers: { apikey: this.evolutionKey } },
+      );
+      if (!res.ok) return { status: 'desconectado' };
+      const json = (await res.json()) as { instance?: { state?: string } };
+      const state = json.instance?.state ?? 'unknown';
+      // Estados Evolution: open, connecting, close, qr
+      if (state === 'open') return { status: 'conectado' };
+      if (state === 'connecting') return { status: 'conectando' };
+      return { status: 'desconectado' };
+    } catch {
+      return { status: 'desconectado' };
+    }
+  }
+
+  async evolutionConectar(tenantId: string): Promise<{
+    status: string;
+    qrCode: string | null;
+  }> {
+    const instancia = tenantId ?? this.evolutionInstance;
+
+    // Verifica se a instância já existe
+    const checkRes = await fetch(
+      `${this.evolutionUrl}/instance/connectionState/${instancia}`,
+      { headers: { apikey: this.evolutionKey } },
+    );
+
+    if (checkRes.ok) {
+      // Instância existe — solicita novo QR (reconectar)
+      const connRes = await fetch(
+        `${this.evolutionUrl}/instance/connect/${instancia}`,
+        { headers: { apikey: this.evolutionKey } },
+      );
+      if (!connRes.ok) {
+        const txt = await connRes.text();
+        throw new Error(`Evolution connect erro: ${connRes.status} - ${txt}`);
+      }
+      const connJson = (await connRes.json()) as { base64?: string };
+      if (connJson.base64) {
+        return { status: 'aguardando_scan', qrCode: connJson.base64 };
+      }
+      return { status: 'conectado', qrCode: null };
+    }
+
+    // Instância não existe — cria e já recebe o QR no response
+    const createRes = await fetch(`${this.evolutionUrl}/instance/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: this.evolutionKey,
+      },
+      body: JSON.stringify({
+        instanceName: instancia,
+        integration: 'WHATSAPP-BAILEYS',
+        qrcode: true,
+      }),
+    });
+
+    if (!createRes.ok) {
+      const txt = await createRes.text();
+      throw new Error(`Evolution create erro: ${createRes.status} - ${txt}`);
+    }
+
+    const createJson = (await createRes.json()) as {
+      qrcode?: { base64?: string };
+    };
+
+    const base64 = createJson.qrcode?.base64;
+    if (base64) {
+      return { status: 'aguardando_scan', qrCode: base64 };
+    }
+
+    // Criou mas sem QR ainda — tenta buscar
+    const connRes2 = await fetch(
+      `${this.evolutionUrl}/instance/connect/${instancia}`,
+      { headers: { apikey: this.evolutionKey } },
+    );
+    if (connRes2.ok) {
+      const j = (await connRes2.json()) as { base64?: string };
+      if (j.base64) return { status: 'aguardando_scan', qrCode: j.base64 };
+    }
+
+    return { status: 'conectando', qrCode: null };
+  }
+
+  async evolutionDesconectar(tenantId: string): Promise<void> {
+    const instancia = tenantId ?? this.evolutionInstance;
+    await fetch(`${this.evolutionUrl}/instance/logout/${instancia}`, {
+      method: 'DELETE',
+      headers: { apikey: this.evolutionKey },
+    });
   }
 }
