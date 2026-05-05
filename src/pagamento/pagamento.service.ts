@@ -13,10 +13,10 @@ import { EmailService } from '../auth/email.service';
 import { IniciarPagamentoDto } from './dto/iniciar-pagamento.dto';
 
 const PRECO_PLANO: Record<Plano, number> = {
-  basico: 49.9,
-  plus: 109,
-  profissional: 109,
-  completo: 129,
+  basico: 39.9,
+  plus: 69.9,
+  profissional: 69.9,
+  completo: 69.9,
 };
 
 const NOME_PLANO: Record<Plano, string> = {

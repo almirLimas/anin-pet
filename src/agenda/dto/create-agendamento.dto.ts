@@ -66,4 +66,11 @@ export class CreateAgendamentoDto {
   @IsOptional()
   @IsString()
   formaPagamento?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID do PacoteClienteAtivo se este agendamento é de pacote',
+  })
+  @IsOptional()
+  @IsString()
+  pacoteClienteAtivoId?: string;
 }

@@ -23,6 +23,7 @@ import { IaModule } from './ia/ia.module';
 import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
 import { FechamentoModule } from './fechamento/fechamento.module';
 import { NpsModule } from './nps/nps.module';
+import { PacotesModule } from './pacotes/pacotes.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { NpsModule } from './nps/nps.module';
     OrdemServicoModule,
     FechamentoModule,
     NpsModule,
+    PacotesModule,
   ],
   providers: [
     {

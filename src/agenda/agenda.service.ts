@@ -43,6 +43,15 @@ export class AgendaService {
         },
       },
       ordemServico: { select: { id: true, status: true } },
+      pacoteAtivo: {
+        select: {
+          id: true,
+          sessoesUsadas: true,
+          totalSessoes: true,
+          status: true,
+          pacote: { select: { nome: true } },
+        },
+      },
     };
   }
 
@@ -76,13 +85,15 @@ export class AgendaService {
   }
 
   async create(tenantId: string, dto: CreateAgendamentoDto) {
-    const { servicoIds, taxaBusca, dataHora, ...rest } = dto;
+    const { servicoIds, taxaBusca, dataHora, pacoteClienteAtivoId, ...rest } =
+      dto;
     const agendamento = await this.prisma.agendamento.create({
       data: {
         ...rest,
         tenantId,
         dataHora: new Date(dataHora),
         ...(taxaBusca !== undefined && { taxaBusca }),
+        ...(pacoteClienteAtivoId && { pacoteClienteAtivoId }),
         servicos: {
           create: servicoIds.map((sid) => ({ servicoId: sid })),
         },
@@ -90,13 +101,13 @@ export class AgendaService {
       include: this.include,
     });
 
-    // Notificação WhatsApp ao cliente
+    // Notificação WhatsApp ao cliente (apenas plano Plus)
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { mensagemAgendamento: true },
+      select: { mensagemAgendamento: true, plano: true },
     });
     const telefone = agendamento.cliente.telefonePrincipal;
-    if (telefone) {
+    if (telefone && tenant?.plano === 'plus') {
       const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -162,6 +173,9 @@ export class AgendaService {
             ...(dto.taxaBusca !== undefined && { taxaBusca: dto.taxaBusca }),
             ...(dto.enderecoBusca && { enderecoBusca: dto.enderecoBusca }),
             ...(dto.observacoes && { observacoes: dto.observacoes }),
+            ...(dto.pacoteClienteAtivoId && {
+              pacoteClienteAtivoId: dto.pacoteClienteAtivoId,
+            }),
             servicos: {
               create: dto.servicoIds.map((sid) => ({ servicoId: sid })),
             },
@@ -210,10 +224,52 @@ export class AgendaService {
 
     // Auto-lançamento financeiro ao concluir
     if (dto.status === 'Concluido') {
+      // Auto-desconto de sessão do pacote vinculado
+      if (atualizado.pacoteAtivo?.status === 'Ativo') {
+        const novoTotal = atualizado.pacoteAtivo.sessoesUsadas + 1;
+        const esgotado = novoTotal >= atualizado.pacoteAtivo.totalSessoes;
+        await this.prisma.pacoteClienteAtivo.update({
+          where: { id: atualizado.pacoteAtivo.id },
+          data: {
+            sessoesUsadas: novoTotal,
+            ...(esgotado && { status: 'Expirado' }),
+          },
+        });
+
+        // Quando o pacote esgota, gera lançamento financeiro com o valor do pacote
+        if (esgotado) {
+          const pacoteCompleto =
+            await this.prisma.pacoteClienteAtivo.findUnique({
+              where: { id: atualizado.pacoteAtivo.id },
+              select: {
+                valor: true,
+                pacote: { select: { nome: true } },
+                cliente: { select: { nome: true } },
+                pet: { select: { nome: true } },
+              },
+            });
+          if (pacoteCompleto) {
+            const nomeCliente = pacoteCompleto.cliente?.nome ?? '';
+            const nomePet = pacoteCompleto.pet?.nome ?? '';
+            const nomePacote = pacoteCompleto.pacote?.nome ?? 'Pacote';
+            await this.financeiro.criar(
+              {
+                tipo: 'Receita',
+                valor: Number(pacoteCompleto.valor),
+                descricao: `${nomePacote} — ${nomePet} (${nomeCliente}) · pacote concluído`,
+                categoria: 'Servico',
+              },
+              tenantId,
+            );
+          }
+        }
+      }
       const jaExiste = await this.prisma.lancamento.findFirst({
         where: { agendamentoId: id },
       });
-      if (!jaExiste) {
+      // Agendamentos vinculados a pacote não geram lançamento por sessão
+      // (o lançamento do pacote é gerado ao concluir todas as sessões)
+      if (!jaExiste && !atualizado.pacoteClienteAtivoId) {
         const taxaBusca = atualizado.taxaBusca
           ? Number(atualizado.taxaBusca)
           : 0;
@@ -265,7 +321,7 @@ export class AgendaService {
         } else {
           const tenant = await this.prisma.tenant.findUnique({
             where: { id: tenantId },
-            select: { nome: true, mensagemAvaliacao: true },
+            select: { nome: true, mensagemAvaliacao: true, plano: true },
           });
           const token = await this.avaliacoes.criarPendente(
             id,
@@ -279,8 +335,8 @@ export class AgendaService {
             .replace(/\/$/, '');
           const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
 
-          // Tenta WhatsApp primeiro
-          if (clienteCompleto.telefonePrincipal) {
+          // Tenta WhatsApp primeiro (apenas plano Plus)
+          if (clienteCompleto.telefonePrincipal && tenant?.plano === 'plus') {
             const templateAvaliacao =
               tenant?.mensagemAvaliacao ??
               'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}';

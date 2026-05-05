@@ -81,4 +81,12 @@ export class CreateAgendamentoRecorrenteDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'ID do PacoteClienteAtivo para vincular todos os agendamentos recorrentes ao pacote',
+  })
+  @IsOptional()
+  @IsString()
+  pacoteClienteAtivoId?: string;
 }

@@ -77,6 +77,8 @@ model Tenant {
   itensOrdemServico ItemOrdemServico[]
   fechamentosCaixa  FechamentoCaixa[]
   feedbacksNPS      FeedbackNPS[]
+  pacotesServico    PacoteServico[]
+  pacotesClientes   PacoteClienteAtivo[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -139,6 +141,7 @@ model Cliente {
   agendamentos Agendamento[]
   avaliacoes   AvaliacaoCliente[]
   vendas       Venda[]
+  pacotesAtivos PacoteClienteAtivo[]
 
   @@unique([tenantId, cpf])
   @@unique([tenantId, codigo])
@@ -167,6 +170,7 @@ model Pet {
   cliente      Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   agendamentos Agendamento[]
   vacinas      Vacina[]
+  pacotesAtivos PacoteClienteAtivo[]
 }
 
 // ── Serviços ──────────────────────────────────────────────────────────────────
@@ -206,6 +210,7 @@ model Servico {
   agendamentos      AgendamentoServico[]
   itensVenda        ItemVenda[]
   itensOrdemServico ItemOrdemServico[]
+  pacotes           PacoteServico[]       @relation("PacoteServicos")
 }
 
 // ── Agenda ───────────────────────────────────────────────────────────────────
@@ -236,6 +241,7 @@ model Agendamento {
   clienteId      String
   petId       String
   tenantId    String
+  pacoteClienteAtivoId String?
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 
@@ -246,6 +252,7 @@ model Agendamento {
   lancamentos  Lancamento[]
   avaliacao    AvaliacaoCliente?
   ordemServico OrdemServico?
+  pacoteAtivo  PacoteClienteAtivo?   @relation(fields: [pacoteClienteAtivoId], references: [id])
 }
 
 model AgendamentoServico {
@@ -534,4 +541,54 @@ model FeedbackNPS {
   enviadoEm   DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+// ── Pacotes Mensais (planos de serviço do petshop para seus clientes) ─────────
+
+enum StatusPacoteCliente {
+  Ativo
+  Expirado
+  Cancelado
+}
+
+model PacoteServico {
+  id              String   @id @default(cuid())
+  nome            String
+  descricao       String?
+  valor           Decimal  @db.Decimal(10, 2)
+  totalSessoes    Int      // ex: 4 sessões no mês
+  validadeDias    Int      @default(30)
+  ativo           Boolean  @default(true)
+  tenantId        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id])
+  clientes PacoteClienteAtivo[]
+  servicos Servico[]             @relation("PacoteServicos")
+
+  @@unique([tenantId, nome])
+}
+
+model PacoteClienteAtivo {
+  id              String              @id @default(cuid())
+  pacoteId        String
+  clienteId       String
+  petId           String?
+  tenantId        String
+  sessoesUsadas   Int                 @default(0)
+  totalSessoes    Int                 // cópia do pacote no momento da ativação
+  valor           Decimal             @db.Decimal(10, 2)
+  status          StatusPacoteCliente @default(Ativo)
+  inicioEm        DateTime            @default(now())
+  expiraEm        DateTime
+  aviso3dEnviadoEm DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  pacote  PacoteServico @relation(fields: [pacoteId], references: [id])
+  cliente Cliente       @relation(fields: [clienteId], references: [id])
+  pet     Pet?          @relation(fields: [petId], references: [id])
+  agendamentos Agendamento[]
 }
