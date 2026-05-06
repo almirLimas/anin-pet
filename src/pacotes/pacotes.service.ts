@@ -108,7 +108,7 @@ export class PacotesService {
     const expiraEm = new Date();
     expiraEm.setDate(expiraEm.getDate() + pacote.validadeDias);
 
-    return this.prisma.pacoteClienteAtivo.create({
+    const pacoteAtivo = await this.prisma.pacoteClienteAtivo.create({
       data: {
         pacoteId: dto.pacoteId,
         clienteId: dto.clienteId,
@@ -124,6 +124,118 @@ export class PacotesService {
         pet: { select: { nome: true } },
       },
     });
+
+    if (dto.agendarSessoes && dto.diaDaSemana !== undefined && dto.hora) {
+      // Usa os serviços do próprio pacote quando não informados explicitamente
+      if (!dto.servicoIds?.length) {
+        const pacoteComServicos = await this.prisma.pacoteServico.findUnique({
+          where: { id: dto.pacoteId },
+          include: { servicos: { select: { id: true } } },
+        });
+        dto.servicoIds = pacoteComServicos?.servicos.map((s) => s.id) ?? [];
+      }
+      await this.agendarSessoesPacote(
+        tenantId,
+        pacoteAtivo.id,
+        pacote.totalSessoes,
+        dto,
+      );
+    }
+
+    return pacoteAtivo;
+  }
+
+  private async agendarSessoesPacote(
+    tenantId: string,
+    pacoteClienteAtivoId: string,
+    totalSessoes: number,
+    dto: AtivarPacoteDto,
+  ) {
+    const base = dto.dataInicio
+      ? new Date(`${dto.dataInicio}T00:00:00`)
+      : new Date();
+    const diff = (dto.diaDaSemana! - base.getDay() + 7) % 7;
+    base.setDate(base.getDate() + diff);
+    const [hora, minuto] = dto.hora!.split(':').map(Number);
+
+    const datas: Date[] = Array.from({ length: totalSessoes }, (_, i) => {
+      const dt = new Date(base);
+      dt.setDate(dt.getDate() + i * 7);
+      dt.setHours(hora, minuto, 0, 0);
+      return dt;
+    });
+
+    if (!dto.petId) {
+      await this.prisma.pacoteClienteAtivo.delete({
+        where: { id: pacoteClienteAtivoId },
+      });
+      throw new BadRequestException(
+        'É necessário informar o pet para agendar as sessões.',
+      );
+    }
+
+    await this.verificarConflitos(tenantId, datas, dto, pacoteClienteAtivoId);
+
+    for (const dt of datas) {
+      await this.prisma.agendamento.create({
+        data: {
+          tenantId,
+          clienteId: dto.clienteId,
+          petId: dto.petId,
+          dataHora: dt,
+          modalidade: dto.modalidade ?? 'ClienteTraz',
+          pacoteClienteAtivoId,
+          servicos: {
+            create: dto.servicoIds!.map((sid) => ({ servicoId: sid })),
+          },
+        },
+      });
+    }
+  }
+
+  private async verificarConflitos(
+    tenantId: string,
+    datas: Date[],
+    dto: AtivarPacoteDto,
+    pacoteClienteAtivoId: string,
+  ) {
+    const conflitos: string[] = [];
+    for (const dt of datas) {
+      const inicio = new Date(dt.getTime() - 30 * 60 * 1000);
+      const fim = new Date(dt.getTime() + 30 * 60 * 1000);
+      const conflito = await this.prisma.agendamento.findFirst({
+        where: {
+          tenantId,
+          ...(dto.petId ? { petId: dto.petId } : { clienteId: dto.clienteId }),
+          dataHora: { gte: inicio, lte: fim },
+          status: { notIn: ['Cancelado'] },
+        },
+        select: { dataHora: true },
+      });
+      if (conflito) {
+        conflitos.push(
+          conflito.dataHora.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+          }) +
+            ' às ' +
+            conflito.dataHora.toLocaleTimeString('pt-BR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+        );
+      }
+    }
+
+    if (conflitos.length > 0) {
+      await this.prisma.pacoteClienteAtivo.delete({
+        where: { id: pacoteClienteAtivoId },
+      });
+      throw new BadRequestException(
+        `Conflito de horário nas seguintes datas: ${conflitos.join(', ')}. Escolha outro dia ou horário.`,
+      );
+    }
   }
 
   async registrarUso(tenantId: string, pacoteClienteId: string) {
@@ -157,6 +269,17 @@ export class PacotesService {
     });
     if (!registro)
       throw new NotFoundException('Registro de pacote não encontrado');
+
+    // Cancelar agendamentos futuros vinculados a este pacote
+    await this.prisma.agendamento.updateMany({
+      where: {
+        tenantId,
+        pacoteClienteAtivoId: pacoteClienteId,
+        dataHora: { gte: new Date() },
+        status: { notIn: ['Cancelado', 'Concluido'] },
+      },
+      data: { status: 'Cancelado' },
+    });
 
     return this.prisma.pacoteClienteAtivo.update({
       where: { id: pacoteClienteId },
