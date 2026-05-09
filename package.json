@@ -9,10 +9,11 @@
     "onlyBuiltDependencies": [
       "@nestjs/core",
       "@prisma/engines",
-      "bcrypt",
-      "prisma",
+      "@scarf/scarf",
       "@swc/core",
       "@whiskeysockets/baileys",
+      "bcrypt",
+      "prisma",
       "protobufjs",
       "sharp"
     ]
