@@ -1,2 +1,13 @@
 packages:
   - '.'
+
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - '@swc/core'
+  - '@whiskeysockets/baileys'
+  - bcrypt
+  - prisma
+  - protobufjs
+  - sharp
