@@ -41,11 +41,11 @@ export class AgendaCronService {
     });
 
     for (const tenant of tenants) {
-      // Clientes do tenant que possuem e-mail e tiveram agendamento concluído
+      // Clientes do tenant que possuem telefone e tiveram agendamento concluído
       const clientes = await this.prisma.cliente.findMany({
         where: {
           tenantId: tenant.id,
-          email: { not: null },
+          telefonePrincipal: { not: '' },
           agendamentos: {
             some: {
               status: StatusAgendamento.Concluido,
@@ -55,7 +55,7 @@ export class AgendaCronService {
         select: {
           id: true,
           nome: true,
-          email: true,
+          telefonePrincipal: true,
           agendamentos: {
             where: { status: StatusAgendamento.Concluido },
             orderBy: { dataHora: 'desc' },
@@ -70,8 +70,8 @@ export class AgendaCronService {
 
       let enviados = 0;
       for (const cliente of clientes) {
-        if (!cliente.email) continue;
-        const ultimoAgendamento = cliente.agendamentos[0];
+        if (!cliente.telefonePrincipal) continue;
+        const ultimoAgendamento = (cliente as any).agendamentos?.[0];
         if (!ultimoAgendamento) continue;
 
         // Só envia se o último agendamento foi há mais de X dias
@@ -82,12 +82,21 @@ export class AgendaCronService {
             (1000 * 60 * 60 * 24),
         );
 
-        await this.emailService.enviarLembreteRetorno(
-          cliente.email,
-          cliente.nome,
-          ultimoAgendamento.pet?.nome ?? 'seu pet',
-          tenant.nome,
-          diasPassados,
+        const petNome = ultimoAgendamento.pet?.nome ?? 'seu pet';
+        const mensagem =
+          `Olá, ${cliente.nome}! 👋\n\n` +
+          `Aqui é do *${tenant.nome}*. Já faz ${diasPassados} dias desde a última visita do ${petNome} e sentimos muita falta de vocês! 🐾\n\n` +
+          `Que tal agendarmos um banho ou uma tosa essa semana? Estamos com horários disponíveis e adoraríamos recebê-los novamente. 😊\n\n` +
+          `Responda aqui para marcarmos o horário!`;
+
+        await this.whatsapp.enviar(
+          {
+            telefone: cliente.telefonePrincipal,
+            mensagem,
+            clienteId: cliente.id,
+            nomeCliente: cliente.nome,
+          },
+          tenant.id,
         );
         enviados++;
       }
