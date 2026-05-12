@@ -18,10 +18,13 @@ const silentLogger = {
   fatal: () => {},
 };
 
+const MAX_TENTATIVAS_RECONEXAO = 3;
+
 interface Instancia {
   sock: ReturnType<typeof makeWASocket>;
   conectado: boolean;
   qrCode: string | null;
+  tentativas: number;
 }
 
 /**
@@ -34,7 +37,7 @@ export class WhatsappInstanceManager {
   private readonly logger = new Logger(WhatsappInstanceManager.name);
   private readonly instancias = new Map<string, Instancia>();
 
-  async conectar(tenantId: string): Promise<void> {
+  async conectar(tenantId: string, tentativas = 0): Promise<void> {
     if (this.instancias.has(tenantId)) return;
 
     const dir = join(process.cwd(), '.whatsapp-session', tenantId);
@@ -45,6 +48,7 @@ export class WhatsappInstanceManager {
       sock: null!,
       conectado: false,
       qrCode: null,
+      tentativas,
     };
     this.instancias.set(tenantId, instancia);
 
@@ -69,6 +73,7 @@ export class WhatsappInstanceManager {
       if (connection === 'open') {
         instancia.conectado = true;
         instancia.qrCode = null;
+        instancia.tentativas = 0;
         this.logger.log(`✅ [${tenantId}] WhatsApp conectado!`);
       }
 
@@ -84,9 +89,19 @@ export class WhatsappInstanceManager {
             `[${tenantId}] Desconectado (logout). Refaça o QR code.`,
           );
         } else {
-          this.logger.warn(`[${tenantId}] Conexão perdida, reconectando...`);
-          this.instancias.delete(tenantId);
-          void this.conectar(tenantId);
+          instancia.tentativas += 1;
+          if (instancia.tentativas >= MAX_TENTATIVAS_RECONEXAO) {
+            this.instancias.delete(tenantId);
+            this.logger.warn(
+              `[${tenantId}] Limite de ${MAX_TENTATIVAS_RECONEXAO} reconexões sem scan atingido. Instância removida.`,
+            );
+          } else {
+            this.logger.warn(
+              `[${tenantId}] Conexão perdida, reconectando... (tentativa ${instancia.tentativas}/${MAX_TENTATIVAS_RECONEXAO})`,
+            );
+            this.instancias.delete(tenantId);
+            void this.conectar(tenantId, instancia.tentativas);
+          }
         }
       }
     });
