@@ -49,6 +49,14 @@ export class AuthController {
     return this.authService.perfil(req.user.id);
   }
 
+  @Get('onboarding-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retorna status dos passos de onboarding' })
+  onboardingStatus(@Request() req: { user: { id: string } }) {
+    return this.authService.onboardingStatus(req.user.id);
+  }
+
   @Patch('perfil')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

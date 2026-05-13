@@ -79,6 +79,10 @@ model Tenant {
   feedbacksNPS      FeedbackNPS[]
   pacotesServico    PacoteServico[]
   pacotesClientes   PacoteClienteAtivo[]
+  fornecedores      Fornecedor[]
+  entradasMercadoria EntradaMercadoria[]
+  itensMercadoria   ItemEntradaMercadoria[]
+  cupons            Cupom[]
 }
 
 // ── Usuários (auth) ──────────────────────────────────────────────────────────
@@ -394,6 +398,7 @@ model Produto {
   movimentacoes     Movimentacao[]
   itensVenda        ItemVenda[]
   itensOrdemServico ItemOrdemServico[]
+  itensEntrada      ItemEntradaMercadoria[]
 }
 
 enum TipoMovimentacao {
@@ -402,19 +407,23 @@ enum TipoMovimentacao {
 }
 
 model Movimentacao {
-  id            String           @id @default(cuid())
-  tipo          TipoMovimentacao
-  quantidade    Decimal          @db.Decimal(10, 3)
-  precoUnitario Decimal?         @db.Decimal(10, 2)
-  motivo        String?
-  observacoes   String?
-  usuarioId     String?
-  produtoId     String
-  tenantId      String
-  createdAt     DateTime         @default(now())
+  id                   String           @id @default(cuid())
+  tipo                 TipoMovimentacao
+  quantidade           Decimal          @db.Decimal(10, 3)
+  precoUnitario        Decimal?         @db.Decimal(10, 2)
+  motivo               String?
+  observacoes          String?
+  usuarioId            String?
+  produtoId            String
+  tenantId             String
+  fornecedorId         String?
+  entradaMercadoriaId  String?
+  createdAt            DateTime         @default(now())
 
-  tenant  Tenant  @relation(fields: [tenantId], references: [id])
-  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  produto          Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  fornecedor       Fornecedor?        @relation(fields: [fornecedorId], references: [id])
+  entradaMercadoria EntradaMercadoria? @relation(fields: [entradaMercadoriaId], references: [id])
 }
 
 // ── Vacinas ──────────────────────────────────────────────────────────────────
@@ -475,12 +484,16 @@ model Venda {
   observacoes    String?
   clienteId      String?
   tenantId       String
+  cupomId        String?
+  cupomCodigo    String?
+  cupomDesconto  Decimal?       @db.Decimal(10, 2)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   tenant  Tenant     @relation(fields: [tenantId], references: [id])
   cliente Cliente?   @relation(fields: [clienteId], references: [id])
   itens   ItemVenda[]
+  cupom   Cupom?     @relation(fields: [cupomId], references: [id])
 
   @@unique([tenantId, numero])
 }
@@ -591,4 +604,92 @@ model PacoteClienteAtivo {
   cliente Cliente       @relation(fields: [clienteId], references: [id])
   pet     Pet?          @relation(fields: [petId], references: [id])
   agendamentos Agendamento[]
+}
+
+// ── Fornecedores ──────────────────────────────────────────────────────────────
+
+model Fornecedor {
+  id        String   @id @default(cuid())
+  nome      String
+  cnpj      String?
+  telefone  String?
+  email     String?
+  contato   String?  // nome da pessoa de contato
+  observacoes String?
+  ativo     Boolean  @default(true)
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id])
+  entradasMercadoria EntradaMercadoria[]
+  movimentacoes     Movimentacao[]
+
+  @@unique([tenantId, cnpj])
+}
+
+// ── Entrada de Mercadoria ─────────────────────────────────────────────────────
+
+enum StatusEntrada {
+  Rascunho
+  Confirmada
+  Cancelada
+}
+
+model EntradaMercadoria {
+  id           String        @id @default(cuid())
+  numero       Int
+  status       StatusEntrada @default(Rascunho)
+  fornecedorId String?
+  observacoes  String?
+  tenantId     String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  tenant       Tenant                  @relation(fields: [tenantId], references: [id])
+  fornecedor   Fornecedor?             @relation(fields: [fornecedorId], references: [id])
+  itens        ItemEntradaMercadoria[]
+  movimentacoes Movimentacao[]
+
+  @@unique([tenantId, numero])
+}
+
+model ItemEntradaMercadoria {
+  id                  String   @id @default(cuid())
+  entradaMercadoriaId String
+  produtoId           String
+  quantidade          Decimal  @db.Decimal(10, 3)
+  precoUnitario       Decimal  @db.Decimal(10, 2)
+  subtotal            Decimal  @db.Decimal(10, 2)
+  tenantId            String
+
+  entrada  EntradaMercadoria @relation(fields: [entradaMercadoriaId], references: [id], onDelete: Cascade)
+  produto  Produto           @relation(fields: [produtoId], references: [id])
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+}
+
+// ── Cupons de Desconto ────────────────────────────────────────────────────────
+
+enum TipoCupom {
+  Percentual
+  Fixo
+}
+
+model Cupom {
+  id         String    @id @default(cuid())
+  codigo     String
+  tipo       TipoCupom
+  valor      Decimal   @db.Decimal(10, 2) // % ou R$
+  usoMaximo  Int?      // null = ilimitado
+  usoAtual   Int       @default(0)
+  ativo      Boolean   @default(true)
+  expiraEm   DateTime?
+  tenantId   String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  vendas Venda[]
+
+  @@unique([tenantId, codigo])
 }

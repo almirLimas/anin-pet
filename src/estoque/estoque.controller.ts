@@ -17,6 +17,8 @@ import { CreateProdutoDto } from './dto/create-produto.dto';
 import { UpdateProdutoDto } from './dto/update-produto.dto';
 import { CreateMovimentacaoDto } from './dto/create-movimentacao.dto';
 
+import { CreateEntradaMercadoriaDto } from './dto/create-entrada-mercadoria.dto';
+
 @ApiTags('Estoque')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -98,5 +100,35 @@ export class EstoqueController {
       dto,
       usuario.id,
     );
+  }
+
+  // ─── Alertas de estoque mínimo ───────────────────────────
+
+  @Get('alertas')
+  findAlertasEstoque(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.estoqueService.findAlertasEstoque(usuario.tenantId);
+  }
+
+  // ─── Entradas de Mercadoria ───────────────────────────
+
+  @Get('entradas')
+  findAllEntradas(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.estoqueService.findAllEntradas(usuario.tenantId);
+  }
+
+  @Get('entradas/:id')
+  findOneEntrada(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.estoqueService.findOneEntrada(usuario.tenantId, id);
+  }
+
+  @Post('entradas')
+  criarEntrada(
+    @Body() dto: CreateEntradaMercadoriaDto,
+    @UsuarioAtual() usuario: { id: string; tenantId: string },
+  ) {
+    return this.estoqueService.criarEntrada(usuario.tenantId, usuario.id, dto);
   }
 }

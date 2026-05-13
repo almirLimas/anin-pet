@@ -24,6 +24,8 @@ import { OrdemServicoModule } from './ordem-servico/ordem-servico.module';
 import { FechamentoModule } from './fechamento/fechamento.module';
 import { NpsModule } from './nps/nps.module';
 import { PacotesModule } from './pacotes/pacotes.module';
+import { FornecedoresModule } from './fornecedores/fornecedores.module';
+import { CuponsModule } from './cupons/cupons.module';
 
 @Module({
   imports: [
@@ -50,6 +52,8 @@ import { PacotesModule } from './pacotes/pacotes.module';
     FechamentoModule,
     NpsModule,
     PacotesModule,
+    FornecedoresModule,
+    CuponsModule,
   ],
   providers: [
     {

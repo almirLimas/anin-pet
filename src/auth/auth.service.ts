@@ -164,6 +164,41 @@ export class AuthService {
     };
   }
 
+  async onboardingStatus(usuarioId: string) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { tenantId: true },
+    });
+    if (!usuario) throw new UnauthorizedException();
+    const tenantId = usuario.tenantId;
+
+    const [
+      temCliente,
+      temServico,
+      temProduto,
+      temAgendamento,
+      temVenda,
+      temAgendamentoConcluido,
+    ] = await Promise.all([
+      this.prisma.cliente.count({ where: { tenantId } }),
+      this.prisma.servico.count({ where: { tenantId } }),
+      this.prisma.produto.count({ where: { tenantId } }),
+      this.prisma.agendamento.count({ where: { tenantId } }),
+      this.prisma.venda.count({ where: { tenantId } }),
+      this.prisma.agendamento.count({
+        where: { tenantId, status: 'Concluido' },
+      }),
+    ]);
+
+    return {
+      temCliente: temCliente > 0,
+      temServico: temServico > 0 || temProduto > 0,
+      temAgendamento: temAgendamento > 0,
+      temVenda: temVenda > 0,
+      temAgendamentoConcluido: temAgendamentoConcluido > 0,
+    };
+  }
+
   async atualizarPerfil(usuarioId: string, dto: AtualizarPerfilDto) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: usuarioId },

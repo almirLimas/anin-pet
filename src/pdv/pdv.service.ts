@@ -48,7 +48,37 @@ export class PdvService {
       (acc, i) => acc + i.subtotal,
       0,
     );
-    const desconto = dto.desconto ?? 0;
+
+    // Validar e aplicar cupom (se informado)
+    let cupomId: string | null = null;
+    let cupomCodigo: string | null = null;
+    let cupomDesconto = 0;
+
+    if (dto.cupomCodigo) {
+      const cupom = await this.prisma.cupom.findUnique({
+        where: {
+          tenantId_codigo: { tenantId, codigo: dto.cupomCodigo.toUpperCase() },
+        },
+      });
+      if (!cupom || !cupom.ativo) {
+        throw new BadRequestException('Cupom inválido ou inativo');
+      }
+      if (cupom.expiraEm && cupom.expiraEm < new Date()) {
+        throw new BadRequestException('Cupom expirado');
+      }
+      if (cupom.usoMaximo !== null && cupom.usoAtual >= cupom.usoMaximo) {
+        throw new BadRequestException('Cupom atingiu o limite de usos');
+      }
+      cupomId = cupom.id;
+      cupomCodigo = cupom.codigo;
+      cupomDesconto =
+        cupom.tipo === 'Percentual'
+          ? (subtotalBruto * Number(cupom.valor)) / 100
+          : Math.min(Number(cupom.valor), subtotalBruto);
+      cupomDesconto = Math.round(cupomDesconto * 100) / 100;
+    }
+
+    const desconto = (dto.desconto ?? 0) + cupomDesconto;
     const valorTotal = Math.max(0, subtotalBruto - desconto);
     const troco =
       dto.valorPago != null && dto.valorPago > valorTotal
@@ -94,6 +124,9 @@ export class PdvService {
           troco,
           observacoes: dto.observacoes ?? null,
           clienteId: dto.clienteId ?? null,
+          cupomId,
+          cupomCodigo,
+          cupomDesconto: cupomDesconto > 0 ? cupomDesconto : null,
           itens: {
             create: itensComSubtotal.map((i) => ({
               tipo: i.tipo,
@@ -151,6 +184,14 @@ export class PdvService {
           tenantId,
         },
       });
+
+      // 4) Incrementar uso do cupom se aplicado
+      if (cupomId) {
+        await tx.cupom.update({
+          where: { id: cupomId },
+          data: { usoAtual: { increment: 1 } },
+        });
+      }
 
       return venda;
     });

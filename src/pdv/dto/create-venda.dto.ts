@@ -77,4 +77,9 @@ export class CreateVendaDto {
   @IsOptional()
   @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Código do cupom de desconto' })
+  @IsOptional()
+  @IsString()
+  cupomCodigo?: string;
 }
