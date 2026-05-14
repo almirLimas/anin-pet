@@ -75,6 +75,52 @@ export class AgendaService {
     });
   }
 
+  async resumoMes(tenantId: string, mes: string) {
+    const [ano, mesNum] = mes.split('-').map(Number);
+    const inicio = new Date(ano, mesNum - 1, 1, 0, 0, 0, 0);
+    const fim = new Date(ano, mesNum, 0, 23, 59, 59, 999);
+
+    const agendamentos = await this.prisma.agendamento.findMany({
+      where: { tenantId, dataHora: { gte: inicio, lte: fim } },
+      select: { dataHora: true, status: true },
+    });
+
+    const byDate: Record<
+      string,
+      {
+        total: number;
+        agendados: number;
+        concluidos: number;
+        cancelados: number;
+        naoCompareceu: number;
+      }
+    > = {};
+
+    for (const a of agendamentos) {
+      const d = `${a.dataHora.getFullYear()}-${String(a.dataHora.getMonth() + 1).padStart(2, '0')}-${String(a.dataHora.getDate()).padStart(2, '0')}`;
+      if (!byDate[d]) {
+        byDate[d] = {
+          total: 0,
+          agendados: 0,
+          concluidos: 0,
+          cancelados: 0,
+          naoCompareceu: 0,
+        };
+      }
+      byDate[d].total++;
+      if (['Agendado', 'Confirmado', 'EmAtendimento'].includes(a.status))
+        byDate[d].agendados++;
+      if (a.status === 'Concluido') byDate[d].concluidos++;
+      if (a.status === 'Cancelado') byDate[d].cancelados++;
+      if (a.status === 'NaoCompareceu') byDate[d].naoCompareceu++;
+    }
+
+    return Object.entries(byDate).map(([data, counts]) => ({
+      data,
+      ...counts,
+    }));
+  }
+
   async findOne(tenantId: string, id: string) {
     const agendamento = await this.prisma.agendamento.findFirst({
       where: { id, tenantId },

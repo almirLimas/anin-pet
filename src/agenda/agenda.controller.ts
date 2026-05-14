@@ -40,6 +40,15 @@ export class AgendaController {
     return this.agendaService.findPendentes(usuario.tenantId);
   }
 
+  @Get('resumo-mes')
+  @ApiQuery({ name: 'mes', required: true, description: 'YYYY-MM' })
+  resumoMes(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('mes') mes: string,
+  ) {
+    return this.agendaService.resumoMes(usuario.tenantId, mes);
+  }
+
   @Get(':id')
   findOne(
     @UsuarioAtual() usuario: { tenantId: string },
