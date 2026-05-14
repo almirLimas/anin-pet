@@ -52,6 +52,70 @@ export class OrdemServicoService {
     };
   }
 
+  /** Sincroniza os itens de serviço de uma OS aberta com os serviços atuais do agendamento:
+   *  - Remove itens de serviço que não existem mais no agendamento
+   *  - Adiciona itens para novos serviços do agendamento
+   *  - Atualiza nome e preço dos itens existentes
+   */
+  private async syncItensServico(
+    osId: string,
+    tenantId: string,
+    servicos: Array<{ servico: { id: string; nome: string; preco: unknown } }>,
+    isMensalista: boolean,
+  ) {
+    const servicoIds = servicos.map((as) => as.servico.id);
+
+    // Proteção: se não houver serviços no agendamento, não mexe nos itens
+    if (servicoIds.length === 0) return;
+
+    // 1. Remove itens de serviço cujo servicoId não está mais no agendamento
+    await this.prisma.itemOrdemServico.deleteMany({
+      where: {
+        ordemServicoId: osId,
+        tipo: 'Servico',
+        NOT: { servicoId: { in: servicoIds } },
+      },
+    });
+
+    for (const as of servicos) {
+      const nomeAtual = isMensalista
+        ? `${as.servico.nome} (Mensalista)`
+        : as.servico.nome;
+      const precoAtual = isMensalista ? 0 : Number(as.servico.preco);
+
+      const itemExistente = await this.prisma.itemOrdemServico.findFirst({
+        where: { ordemServicoId: osId, servicoId: as.servico.id },
+        select: { id: true, quantidade: true },
+      });
+
+      if (itemExistente) {
+        // 2. Atualiza nome e preço do item existente
+        await this.prisma.itemOrdemServico.update({
+          where: { id: itemExistente.id },
+          data: {
+            nome: nomeAtual,
+            precoUnitario: precoAtual,
+            subtotal: precoAtual * Number(itemExistente.quantidade),
+          },
+        });
+      } else {
+        // 3. Cria item para serviço novo no agendamento
+        await this.prisma.itemOrdemServico.create({
+          data: {
+            ordemServicoId: osId,
+            tipo: 'Servico',
+            nome: nomeAtual,
+            quantidade: 1,
+            precoUnitario: precoAtual,
+            subtotal: precoAtual,
+            servicoId: as.servico.id,
+            tenantId,
+          },
+        });
+      }
+    }
+  }
+
   async criarParaAgendamento(tenantId: string, agendamentoId: string) {
     const agendamento = await this.prisma.agendamento.findFirst({
       where: { id: agendamentoId, tenantId },
@@ -80,44 +144,13 @@ export class OrdemServicoService {
       // Se a OS ainda está aberta, sincroniza nome e preço dos itens de serviço
       // com os dados atuais do cadastro (caso o serviço tenha sido editado)
       if (jaExiste.status === 'Aberta') {
-        const isMensalista = agendamento.cliente.mensalista;
-        const syncUpdates = jaExiste.itens
-          .filter((item) => item.tipo === 'Servico' && item.servicoId)
-          .flatMap((item) => {
-            const servicoAtual = agendamento.servicos.find(
-              (as) => as.servico.id === item.servicoId,
-            );
-            if (!servicoAtual) return [];
-
-            const nomeEsperado = isMensalista
-              ? `${servicoAtual.servico.nome} (Mensalista)`
-              : servicoAtual.servico.nome;
-            const precoEsperado = isMensalista
-              ? 0
-              : Number(servicoAtual.servico.preco);
-
-            if (
-              item.nome !== nomeEsperado ||
-              Number(item.precoUnitario) !== precoEsperado
-            ) {
-              return [
-                this.prisma.itemOrdemServico.update({
-                  where: { id: item.id },
-                  data: {
-                    nome: nomeEsperado,
-                    precoUnitario: precoEsperado,
-                    subtotal: precoEsperado * Number(item.quantidade),
-                  },
-                }),
-              ];
-            }
-            return [];
-          });
-
-        if (syncUpdates.length > 0) {
-          await this.prisma.$transaction(syncUpdates);
-          return this.findOne(tenantId, jaExiste.id);
-        }
+        await this.syncItensServico(
+          jaExiste.id,
+          tenantId,
+          agendamento.servicos,
+          agendamento.cliente.mensalista,
+        );
+        return this.findOne(tenantId, jaExiste.id);
       }
 
       return jaExiste;
