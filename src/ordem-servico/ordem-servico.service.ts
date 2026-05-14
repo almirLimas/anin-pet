@@ -76,6 +76,50 @@ export class OrdemServicoService {
         });
         return this.findOne(tenantId, jaExiste.id);
       }
+
+      // Se a OS ainda está aberta, sincroniza nome e preço dos itens de serviço
+      // com os dados atuais do cadastro (caso o serviço tenha sido editado)
+      if (jaExiste.status === 'Aberta') {
+        const isMensalista = agendamento.cliente.mensalista;
+        const syncUpdates = jaExiste.itens
+          .filter((item) => item.tipo === 'Servico' && item.servicoId)
+          .flatMap((item) => {
+            const servicoAtual = agendamento.servicos.find(
+              (as) => as.servico.id === item.servicoId,
+            );
+            if (!servicoAtual) return [];
+
+            const nomeEsperado = isMensalista
+              ? `${servicoAtual.servico.nome} (Mensalista)`
+              : servicoAtual.servico.nome;
+            const precoEsperado = isMensalista
+              ? 0
+              : Number(servicoAtual.servico.preco);
+
+            if (
+              item.nome !== nomeEsperado ||
+              Number(item.precoUnitario) !== precoEsperado
+            ) {
+              return [
+                this.prisma.itemOrdemServico.update({
+                  where: { id: item.id },
+                  data: {
+                    nome: nomeEsperado,
+                    precoUnitario: precoEsperado,
+                    subtotal: precoEsperado * Number(item.quantidade),
+                  },
+                }),
+              ];
+            }
+            return [];
+          });
+
+        if (syncUpdates.length > 0) {
+          await this.prisma.$transaction(syncUpdates);
+          return this.findOne(tenantId, jaExiste.id);
+        }
+      }
+
       return jaExiste;
     }
 

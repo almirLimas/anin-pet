@@ -28,7 +28,49 @@ export class ServicosService {
 
   async update(tenantId: string, id: string, dto: UpdateServicoDto) {
     await this.findOne(tenantId, id);
-    return this.prisma.servico.update({ where: { id }, data: dto });
+    const updated = await this.prisma.servico.update({
+      where: { id },
+      data: dto,
+    });
+
+    // Propaga nome/preço para itens de OS ainda abertas que referenciam este serviço
+    if (dto.nome !== undefined || dto.preco !== undefined) {
+      const itensAbertos = await this.prisma.itemOrdemServico.findMany({
+        where: {
+          servicoId: id,
+          tenantId,
+          ordemServico: { status: 'Aberta' },
+        },
+        select: { id: true, nome: true, quantidade: true },
+      });
+
+      await this.prisma.$transaction(
+        itensAbertos.map((item) => {
+          const ehMensalista = item.nome.includes('(Mensalista)');
+
+          let novoNome: string | undefined;
+          if (dto.nome !== undefined) {
+            novoNome = ehMensalista ? `${dto.nome} (Mensalista)` : dto.nome;
+          }
+
+          const novoPreco =
+            !ehMensalista && dto.preco !== undefined ? dto.preco : undefined;
+
+          return this.prisma.itemOrdemServico.update({
+            where: { id: item.id },
+            data: {
+              ...(novoNome !== undefined && { nome: novoNome }),
+              ...(novoPreco !== undefined && {
+                precoUnitario: novoPreco,
+                subtotal: novoPreco * Number(item.quantidade),
+              }),
+            },
+          });
+        }),
+      );
+    }
+
+    return updated;
   }
 
   async remove(tenantId: string, id: string) {
