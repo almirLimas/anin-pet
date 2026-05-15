@@ -1364,7 +1364,9 @@ Data e hora atual: ${agora}.`;
                 : 'não definido',
               diaVencimento: c.diaVencimento ?? 'não definido',
               ultimoPagamento: c.ultimaMensalidadePaga
-                ? c.ultimaMensalidadePaga.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+                ? c.ultimaMensalidadePaga.toLocaleDateString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                  })
                 : 'nunca pago',
               status: c.status,
             })),
@@ -1421,7 +1423,9 @@ Data e hora atual: ${agora}.`;
             total: agendamentos.length,
             agendamentos: agendamentos.map((a) => ({
               id: a.id,
-              data: a.dataHora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+              data: a.dataHora.toLocaleDateString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+              }),
               horario: a.dataHora.toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -1598,7 +1602,9 @@ Data e hora atual: ${agora}.`;
             recentes: recentes.map((a) => ({
               cliente: a.cliente.nome,
               nota: a.nota,
-              data: a.respondidaEm?.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+              data: a.respondidaEm?.toLocaleDateString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+              }),
             })),
           };
         }
@@ -1759,7 +1765,9 @@ Data e hora atual: ${agora}.`;
             quantidadeSemanas,
             cobrancaInfo: `A mensalidade será cobrada automaticamente a cada 4 sessões concluídas.`,
             primeiroAgendamento: criados[0]
-              ? new Date(criados[0].dataHora).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+              ? new Date(criados[0].dataHora).toLocaleDateString('pt-BR', {
+                  timeZone: 'America/Sao_Paulo',
+                })
               : null,
             ultimoAgendamento: criados[criados.length - 1]
               ? new Date(
