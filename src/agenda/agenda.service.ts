@@ -158,10 +158,12 @@ export class AgendaService {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
+        timeZone: 'America/Sao_Paulo',
       });
       const horaFormatada = agendamento.dataHora.toLocaleTimeString('pt-BR', {
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
       });
       const nomesServicos = agendamento.servicos
         .map((s) => s.servico.nome)
