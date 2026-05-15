@@ -311,7 +311,19 @@ export class WhatsappService {
       if (connJson.base64) {
         return { status: 'aguardando_scan', qrCode: connJson.base64 };
       }
-      return { status: 'conectado', qrCode: null };
+      // Sem QR — verifica o estado real antes de assumir "conectado"
+      const stateRes = await fetch(
+        `${this.evolutionUrl}/instance/connectionState/${instancia}`,
+        { headers: { apikey: this.evolutionKey } },
+      );
+      if (stateRes.ok) {
+        const stateJson = (await stateRes.json()) as {
+          instance?: { state?: string };
+        };
+        const state = stateJson.instance?.state;
+        if (state === 'open') return { status: 'conectado', qrCode: null };
+      }
+      return { status: 'desconectado', qrCode: null };
     }
 
     // Instância não existe — cria e já recebe o QR no response
