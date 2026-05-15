@@ -307,9 +307,13 @@ export class WhatsappService {
         const txt = await connRes.text();
         throw new Error(`Evolution connect erro: ${connRes.status} - ${txt}`);
       }
-      const connJson = (await connRes.json()) as { base64?: string };
-      if (connJson.base64) {
-        return { status: 'aguardando_scan', qrCode: connJson.base64 };
+      const connJson = (await connRes.json()) as {
+        base64?: string;
+        code?: string;
+      };
+      const qr = connJson.base64 ?? connJson.code ?? null;
+      if (qr) {
+        return { status: 'aguardando_scan', qrCode: qr };
       }
       // Sem QR — verifica o estado real antes de assumir "conectado"
       const stateRes = await fetch(
@@ -346,10 +350,10 @@ export class WhatsappService {
     }
 
     const createJson = (await createRes.json()) as {
-      qrcode?: { base64?: string };
+      qrcode?: { base64?: string; code?: string };
     };
 
-    const base64 = createJson.qrcode?.base64;
+    const base64 = createJson.qrcode?.base64 ?? createJson.qrcode?.code ?? null;
     if (base64) {
       return { status: 'aguardando_scan', qrCode: base64 };
     }
@@ -360,8 +364,9 @@ export class WhatsappService {
       { headers: { apikey: this.evolutionKey } },
     );
     if (connRes2.ok) {
-      const j = (await connRes2.json()) as { base64?: string };
-      if (j.base64) return { status: 'aguardando_scan', qrCode: j.base64 };
+      const j = (await connRes2.json()) as { base64?: string; code?: string };
+      const qr2 = j.base64 ?? j.code ?? null;
+      if (qr2) return { status: 'aguardando_scan', qrCode: qr2 };
     }
 
     return { status: 'conectando', qrCode: null };
