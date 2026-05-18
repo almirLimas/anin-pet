@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateServicoDto } from './dto/create-servico.dto';
 import { UpdateServicoDto } from './dto/update-servico.dto';
@@ -75,6 +79,19 @@ export class ServicosService {
 
   async remove(tenantId: string, id: string) {
     await this.findOne(tenantId, id);
+
+    const [agendamentos, itensVenda, itensOS] = await Promise.all([
+      this.prisma.agendamentoServico.count({ where: { servicoId: id } }),
+      this.prisma.itemVenda.count({ where: { servicoId: id } }),
+      this.prisma.itemOrdemServico.count({ where: { servicoId: id } }),
+    ]);
+
+    if (agendamentos > 0 || itensVenda > 0 || itensOS > 0) {
+      throw new ConflictException(
+        'Este serviço possui agendamentos ou vendas vinculadas e não pode ser excluído. Desative-o para que não apareça em novos agendamentos.',
+      );
+    }
+
     return this.prisma.servico.delete({ where: { id } });
   }
 }
