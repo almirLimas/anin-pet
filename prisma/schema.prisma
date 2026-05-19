@@ -58,6 +58,7 @@ model Tenant {
   taxaBusca             Decimal?  @db.Decimal(10, 2)
   mensagemAgendamento   String?
   mensagemAvaliacao     String?
+  linkGoogle            String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 

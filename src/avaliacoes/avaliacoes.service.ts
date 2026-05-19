@@ -6,12 +6,16 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../auth/email.service';
 
 @Injectable()
 export class AvaliacoesService {
   private readonly logger = new Logger(AvaliacoesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   /** Cria um registro de avaliação pendente e retorna o token gerado */
   async criarPendente(
@@ -27,12 +31,19 @@ export class AvaliacoesService {
   }
 
   /** Registra a nota enviada pelo cliente via link de e-mail */
-  async responder(token: string, nota: number): Promise<void> {
+  async responder(
+    token: string,
+    nota: number,
+  ): Promise<{ linkGoogle: string | null }> {
     if (nota < 1 || nota > 5) {
       throw new BadRequestException('Nota deve ser entre 1 e 5');
     }
     const avaliacao = await this.prisma.avaliacaoCliente.findUnique({
       where: { token },
+      include: {
+        tenant: { select: { linkGoogle: true, nome: true } },
+        cliente: { select: { nome: true } },
+      },
     });
     if (!avaliacao) throw new NotFoundException('Avaliação não encontrada');
     if (avaliacao.respondidaEm) {
@@ -42,6 +53,31 @@ export class AvaliacoesService {
       where: { token },
       data: { nota, respondidaEm: new Date() },
     });
+
+    // Notifica o dono do petshop por e-mail (sem await — não bloqueia a resposta)
+    this.prisma.usuario
+      .findFirst({
+        where: {
+          tenantId: avaliacao.tenantId,
+          perfil: 'admin',
+          status: 'ativo',
+        },
+        select: { email: true },
+      })
+      .then((admin) => {
+        if (!admin) return;
+        return this.emailService.enviarNotificacaoAvaliacao({
+          emailDono: admin.email,
+          nomePetshop: avaliacao.tenant.nome,
+          nomeCliente: avaliacao.cliente.nome,
+          nota,
+        });
+      })
+      .catch((err) =>
+        this.logger.error('Falha ao enviar e-mail de avaliação', err),
+      );
+
+    return { linkGoogle: avaliacao.tenant.linkGoogle ?? null };
   }
 
   /** Resumo de satisfação para o dashboard do tenant */

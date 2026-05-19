@@ -573,4 +573,65 @@ export class EmailService {
       this.logger.error('Falha ao enviar alerta de erro', err);
     }
   }
+
+  async enviarNotificacaoAvaliacao(params: {
+    emailDono: string;
+    nomePetshop: string;
+    nomeCliente: string;
+    nota: number;
+  }) {
+    const { emailDono, nomePetshop, nomeCliente, nota } = params;
+    const emojis = ['', '😞', '😕', '😐', '🙂', '😍'];
+    const labels = [
+      '',
+      'Muito insatisfeito',
+      'Insatisfeito',
+      'Neutro',
+      'Satisfeito',
+      'Muito satisfeito',
+    ];
+    const estrelasFull = '★'.repeat(nota) + '☆'.repeat(5 - nota);
+    let corNota = '#ef4444';
+    if (nota >= 4) corNota = '#10b981';
+    else if (nota === 3) corNota = '#f59e0b';
+    const dataHora = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+    });
+
+    try {
+      await this.enviar(
+        emailDono,
+        `Nova avaliação recebida: ${estrelasFull} — ${nomePetshop}`,
+        `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #1d9fb6;">Nova avaliação recebida! 🐾</h2>
+          <p>Olá, <strong>${nomePetshop}</strong>!</p>
+          <p>O cliente <strong>${nomeCliente}</strong> acabou de avaliar o atendimento:</p>
+          <div style="text-align:center;margin:28px 0;padding:24px;background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;">
+            <div style="font-size:48px;line-height:1;margin-bottom:8px;">${emojis[nota]}</div>
+            <div style="font-size:32px;color:${corNota};letter-spacing:4px;margin-bottom:8px;">${estrelasFull}</div>
+            <div style="font-size:16px;font-weight:bold;color:${corNota};">${nota}/5 — ${labels[nota]}</div>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <tr>
+              <td style="padding:6px 0;color:#6b7280;width:120px;">Cliente</td>
+              <td style="padding:6px 0;font-weight:bold;">${nomeCliente}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#6b7280;">Data/Hora</td>
+              <td style="padding:6px 0;">${dataHora}</td>
+            </tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enviar notificação de avaliação para ${emailDono}`,
+        err,
+      );
+    }
+  }
 }

@@ -531,7 +531,11 @@ export class AuthService {
     });
     const tenant = await this.prisma.tenant.findUniqueOrThrow({
       where: { id: admin.tenantId },
-      select: { mensagemAgendamento: true, mensagemAvaliacao: true },
+      select: {
+        mensagemAgendamento: true,
+        mensagemAvaliacao: true,
+        linkGoogle: true,
+      },
     });
     return {
       mensagem:
@@ -540,12 +544,13 @@ export class AuthService {
       mensagemAvaliacao:
         tenant.mensagemAvaliacao ??
         'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}',
+      linkGoogle: tenant.linkGoogle ?? null,
     };
   }
 
   async atualizarMensagemWhatsapp(
     adminId: string,
-    dto: { mensagem?: string; mensagemAvaliacao?: string },
+    dto: { mensagem?: string; mensagemAvaliacao?: string; linkGoogle?: string },
   ) {
     const admin = await this.prisma.usuario.findUniqueOrThrow({
       where: { id: adminId },
@@ -564,6 +569,9 @@ export class AuthService {
         }),
         ...(dto.mensagemAvaliacao !== undefined && {
           mensagemAvaliacao: dto.mensagemAvaliacao,
+        }),
+        ...(dto.linkGoogle !== undefined && {
+          linkGoogle: dto.linkGoogle || null,
         }),
       },
     });

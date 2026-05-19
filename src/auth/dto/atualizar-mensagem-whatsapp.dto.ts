@@ -21,4 +21,14 @@ export class AtualizarMensagemWhatsappDto {
   @IsString()
   @MaxLength(1000)
   mensagemAvaliacao?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Link do Google para avaliação externa do petshop',
+    example: 'https://g.page/r/XXXXX/review',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  linkGoogle?: string;
 }
