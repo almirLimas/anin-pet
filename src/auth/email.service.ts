@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly remetente: string;
+  private readonly notificacaoInterna = 'josealmirsla@gmail.com';
 
   constructor(private readonly config: ConfigService) {
     this.remetente = config.get<string>('EMAIL_FROM', 'noreply@aninpet.com.br');
@@ -41,9 +42,14 @@ export class EmailService {
       this.logger.warn(`[EMAIL IGNORADO] Para: ${to} | Assunto: ${subject}`);
       return;
     }
+    const replyTo = this.config.get<string>(
+      'EMAIL_REPLY_TO',
+      'contato.aninpet@gmail.com',
+    );
     const { error } = await resend.emails.send({
       from: `AninPet <${this.remetente}>`,
       to,
+      replyTo: replyTo,
       subject,
       html,
     });
@@ -54,53 +60,25 @@ export class EmailService {
     try {
       await this.enviar(
         email,
-        `Bem-vindo ao AninPet, ${nomePetshop}! 🐾`,
+        `Seu acesso ao Anin Pet está disponível 🐾`,
         `
         <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;">
-          <h2 style="color: #1d9fb6;">Tudo pronto para começar! 🎉</h2>
-          <p>Olá, <strong>${nome}</strong>! Seu petshop <strong>${nomePetshop}</strong> está cadastrado no AninPet. Aqui estão os primeiros passos para configurar o sistema:</p>
-
-          <table style="width:100%;border-collapse:collapse;margin:20px 0;">
-            <tr style="background:#f0fafb;">
-              <td style="padding:12px 16px;font-size:22px;width:48px;">1️⃣</td>
-              <td style="padding:12px 16px;">
-                <strong>Cadastre seus serviços</strong><br/>
-                <span style="color:#6b7280;font-size:13px;">Vá em <em>Serviços</em> e cadastre banho, tosa, consulta etc. com o preço e duração de cada um.</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:12px 16px;font-size:22px;">2️⃣</td>
-              <td style="padding:12px 16px;">
-                <strong>Configure a taxa de busca (taxidog)</strong><br/>
-                <span style="color:#6b7280;font-size:13px;">Se seu petshop faz transporte de pets, defina o valor fixo da taxa em <em>Configurações → Taxa de busca</em>. Esse valor será somado automaticamente nos agendamentos marcados como "Petshop Busca".</span>
-              </td>
-            </tr>
-            <tr style="background:#f0fafb;">
-              <td style="padding:12px 16px;font-size:22px;">3️⃣</td>
-              <td style="padding:12px 16px;">
-                <strong>Defina sua meta mensal</strong><br/>
-                <span style="color:#6b7280;font-size:13px;">Em <em>Configurações → Meta mensal</em>, informe quanto você quer faturar por mês. O painel vai mostrar seu progresso em tempo real.</span>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:12px 16px;font-size:22px;">4️⃣</td>
-              <td style="padding:12px 16px;">
-                <strong>Cadastre seus clientes e pets</strong><br/>
-                <span style="color:#6b7280;font-size:13px;">Adicione os clientes na seção <em>Clientes</em>. Você já pode incluir os pets deles no mesmo cadastro.</span>
-              </td>
-            </tr>
-            <tr style="background:#f0fafb;">
-              <td style="padding:12px 16px;font-size:22px;">5️⃣</td>
-              <td style="padding:12px 16px;">
-                <strong>Faça seu primeiro agendamento</strong><br/>
-                <span style="color:#6b7280;font-size:13px;">Na agenda, clique em <em>Novo agendamento</em>, escolha o cliente, o pet, o serviço e o horário. Pronto!</span>
-              </td>
-            </tr>
-          </table>
-
-          <p style="color:#6b7280;font-size:13px;">Você tem <strong>7 dias de teste gratuito</strong>. Aproveite para explorar todas as funcionalidades!</p>
+          <h2 style="color: #1d9fb6;">Olá, tudo bem? 😊</h2>
+          <p>Seu acesso ao <strong>ANIN Pet</strong> já está disponível.</p>
+          <p>Organize agendamentos, controle financeiro, estoque e automatize mensagens do seu pet shop em um só lugar.</p>
+          <div style="text-align: center; margin: 32px 0;">
+            <a href="https://www.aninpet.com.br"
+               style="background:#1d9fb6;color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:bold;">
+              Acessar o Anin Pet
+            </a>
+          </div>
+          <p style="color:#6b7280;font-size:14px;">
+            Ou acesse diretamente:<br/>
+            <a href="https://www.aninpet.com.br" style="color:#1d9fb6;">https://www.aninpet.com.br</a>
+          </p>
           <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
-          <p style="color:#9ca3af;font-size:12px;">AninPet — Sistema de gestão para petshops</p>
+          <p style="color:#6b7280;font-size:13px;">Obrigado por conhecer o Anin Pet 💙</p>
+          <p style="color:#9ca3af;font-size:12px;">Anin Pet — Sistema de gestão para petshops</p>
         </div>
       `,
       );
@@ -632,6 +610,22 @@ export class EmailService {
         `Falha ao enviar notificação de avaliação para ${emailDono}`,
         err,
       );
+    }
+  }
+
+  async enviarNotificacaoInterna(assunto: string, corpo: string) {
+    try {
+      await this.enviar(
+        this.notificacaoInterna,
+        assunto,
+        `<div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+          <p>${corpo}</p>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">Anin Pet — notificação interna automática</p>
+        </div>`,
+      );
+    } catch (err) {
+      this.logger.error('Falha ao enviar notificação interna', err);
     }
   }
 }

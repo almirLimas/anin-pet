@@ -71,7 +71,7 @@ export class PagamentoCronService {
     const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
     const link = `${frontendUrl}/configuracoes/assinatura`;
 
-    for (const diasRestantes of [3, 1]) {
+    for (const diasRestantes of [3, 2, 1]) {
       const inicio = new Date(agora);
       inicio.setDate(inicio.getDate() + diasRestantes);
       inicio.setHours(0, 0, 0, 0);
@@ -79,8 +79,7 @@ export class PagamentoCronService {
       const fim = new Date(inicio);
       fim.setHours(23, 59, 59, 999);
 
-      const campoAviso =
-        diasRestantes === 3 ? 'avisoTrial3dEnviadoEm' : 'avisoTrial1dEnviadoEm';
+      const campoAviso = this.campoAvisoPorDias(diasRestantes);
 
       const tenants = await this.prisma.tenant.findMany({
         where: {
@@ -90,6 +89,7 @@ export class PagamentoCronService {
         },
         select: {
           id: true,
+          nome: true,
           usuarios: {
             select: { email: true, nomeCompleto: true },
             where: { status: 'ativo', perfil: 'admin' },
@@ -118,6 +118,14 @@ export class PagamentoCronService {
             link,
             diasRestantes,
           );
+
+          // Notifica o dono do sistema
+          await this.emailService.enviarNotificacaoInterna(
+            `⚠️ Trial expirando em ${diasRestantes}d — ${tenant.nome}`,
+            `Aviso enviado para <strong>${admin.nomeCompleto}</strong> (${admin.email})<br/>
+             Petshop: <strong>${tenant.nome}</strong><br/>
+             Expira em: <strong>${diasRestantes} dia(s)</strong>`,
+          );
         }
 
         await this.prisma.tenant.update({
@@ -131,5 +139,11 @@ export class PagamentoCronService {
         );
       }
     }
+  }
+
+  private campoAvisoPorDias(dias: number): string {
+    if (dias === 3) return 'avisoTrial3dEnviadoEm';
+    if (dias === 2) return 'avisoTrial2dEnviadoEm';
+    return 'avisoTrial1dEnviadoEm';
   }
 }

@@ -51,6 +51,7 @@ model Tenant {
   assinaturaStatus     AssinaturaStatus @default(trial)
   trialExpiraEm        DateTime?
   avisoTrial3dEnviadoEm DateTime?
+  avisoTrial2dEnviadoEm DateTime?
   avisoTrial1dEnviadoEm DateTime?
   mpAssinaturaId   String?
   mpPagamentoId    String?
