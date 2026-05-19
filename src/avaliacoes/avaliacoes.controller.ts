@@ -26,6 +26,13 @@ class ResponderAvaliacaoDto {
 export class AvaliacoesController {
   constructor(private readonly avaliacoesService: AvaliacoesService) {}
 
+  /** Rota PÚBLICA — retorna nome do petshop para exibir na página de avaliação */
+  @Get('info/:token')
+  @ApiOperation({ summary: 'Dados públicos da avaliação (nome do petshop)' })
+  buscarInfo(@Param('token') token: string) {
+    return this.avaliacoesService.buscarInfoPorToken(token);
+  }
+
   /** Rota PÚBLICA — cliente acessa via link do e-mail */
   @Post('responder/:token')
   @HttpCode(HttpStatus.OK)

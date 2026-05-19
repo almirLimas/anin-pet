@@ -17,6 +17,16 @@ export class AvaliacoesService {
     private readonly emailService: EmailService,
   ) {}
 
+  /** Retorna dados públicos da avaliação para exibição na página do cliente */
+  async buscarInfoPorToken(token: string): Promise<{ nomePetshop: string }> {
+    const avaliacao = await this.prisma.avaliacaoCliente.findUnique({
+      where: { token },
+      include: { tenant: { select: { nome: true } } },
+    });
+    if (!avaliacao) throw new NotFoundException('Avaliação não encontrada');
+    return { nomePetshop: avaliacao.tenant.nome };
+  }
+
   /** Cria um registro de avaliação pendente e retorna o token gerado */
   async criarPendente(
     agendamentoId: string,
