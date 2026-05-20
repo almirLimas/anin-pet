@@ -1,2 +1,6 @@
-ALTER TYPE "StatusGaiola" ADD VALUE IF NOT EXISTS 'AguardandoBusca';
-ALTER TYPE "StatusGaiola" ADD VALUE IF NOT EXISTS 'AguardandoCliente';
+-- CreateEnum
+CREATE TYPE "StatusGaiola" AS ENUM ('Aguardando', 'EmBanho', 'Secando', 'AguardandoBusca', 'AguardandoCliente', 'Pronto', 'Entregue');
+
+-- AlterTable
+ALTER TABLE "Agendamento" ADD COLUMN IF NOT EXISTS "gaiola" INTEGER;
+ALTER TABLE "Agendamento" ADD COLUMN IF NOT EXISTS "statusGaiola" "StatusGaiola";
