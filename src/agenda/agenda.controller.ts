@@ -16,6 +16,21 @@ import { AgendaService } from './agenda.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { UpdateAgendamentoDto } from './dto/update-agendamento.dto';
 import { CreateAgendamentoRecorrenteDto } from './dto/create-agendamento-recorrente.dto';
+import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { StatusGaiola } from '@prisma/client';
+
+class AtualizarStatusGaiolaDto {
+  @IsEnum(StatusGaiola)
+  statusGaiola!: StatusGaiola;
+
+  @IsOptional()
+  @IsString()
+  formaPagamento?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  clienteJaBuscou?: boolean;
+}
 
 @ApiTags('Agenda')
 @ApiBearerAuth()
@@ -38,6 +53,35 @@ export class AgendaController {
   @Get('pendentes')
   findPendentes(@UsuarioAtual() usuario: { tenantId: string }) {
     return this.agendaService.findPendentes(usuario.tenantId);
+  }
+
+  @Get('gaiolas')
+  @ApiQuery({ name: 'data', required: true, description: 'YYYY-MM-DD' })
+  buscarGaiolas(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('data') data: string,
+  ) {
+    return this.agendaService.buscarGaiolas(usuario.tenantId, data);
+  }
+
+  @Patch(':id/status-gaiola')
+  atualizarStatusGaiola(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+    @Body() dto: AtualizarStatusGaiolaDto,
+  ) {
+    return this.agendaService.atualizarStatusGaiola(
+      usuario.tenantId,
+      id,
+      dto.statusGaiola,
+      dto.formaPagamento,
+      dto.clienteJaBuscou,
+    );
+  }
+
+  @Get('concluidos')
+  concluidosSemanaEMes(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.agendaService.concluidosSemanaEMes(usuario.tenantId);
   }
 
   @Get('resumo-mes')

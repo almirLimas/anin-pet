@@ -14,6 +14,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
+import { AtualizarTotalGaiolasDto } from './dto/atualizar-total-gaiolas.dto';
 import { EsqueceuSenhaDto } from './dto/esqueceu-senha.dto';
 import { LoginDto } from './dto/login.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
@@ -257,6 +258,7 @@ export class AuthService {
             trialExpiraEm: true,
             metaMensal: true,
             taxaBusca: true,
+            totalGaiolas: true,
           },
         },
       },
@@ -276,6 +278,7 @@ export class AuthService {
       taxaBusca: usuario.tenant.taxaBusca
         ? Number(usuario.tenant.taxaBusca)
         : null,
+      totalGaiolas: usuario.tenant.totalGaiolas ?? 10,
     };
   }
 
@@ -307,6 +310,24 @@ export class AuthService {
     });
 
     return { taxaBusca: dto.taxaBusca };
+  }
+
+  async atualizarTotalGaiolas(
+    usuarioId: string,
+    dto: AtualizarTotalGaiolasDto,
+  ) {
+    const usuario = await this.prisma.usuario.findUnique({
+      where: { id: usuarioId },
+      select: { tenantId: true },
+    });
+    if (!usuario) throw new UnauthorizedException();
+
+    await this.prisma.tenant.update({
+      where: { id: usuario.tenantId },
+      data: { totalGaiolas: dto.totalGaiolas },
+    });
+
+    return { totalGaiolas: dto.totalGaiolas };
   }
 
   async solicitarResetSenha(dto: EsqueceuSenhaDto) {
@@ -534,6 +555,7 @@ export class AuthService {
       select: {
         mensagemAgendamento: true,
         mensagemAvaliacao: true,
+        mensagemPetPronto: true,
         linkGoogle: true,
       },
     });
@@ -544,13 +566,21 @@ export class AuthService {
       mensagemAvaliacao:
         tenant.mensagemAvaliacao ??
         'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}',
+      mensagemPetPronto:
+        tenant.mensagemPetPronto ??
+        'Olá, {nome}! 🐾 O {pet} já está prontinho e esperando por você!\n\nPode vir buscar quando quiser. 😊',
       linkGoogle: tenant.linkGoogle ?? null,
     };
   }
 
   async atualizarMensagemWhatsapp(
     adminId: string,
-    dto: { mensagem?: string; mensagemAvaliacao?: string; linkGoogle?: string },
+    dto: {
+      mensagem?: string;
+      mensagemAvaliacao?: string;
+      mensagemPetPronto?: string;
+      linkGoogle?: string;
+    },
   ) {
     const admin = await this.prisma.usuario.findUniqueOrThrow({
       where: { id: adminId },
@@ -569,6 +599,9 @@ export class AuthService {
         }),
         ...(dto.mensagemAvaliacao !== undefined && {
           mensagemAvaliacao: dto.mensagemAvaliacao,
+        }),
+        ...(dto.mensagemPetPronto !== undefined && {
+          mensagemPetPronto: dto.mensagemPetPronto,
         }),
         ...(dto.linkGoogle !== undefined && {
           linkGoogle: dto.linkGoogle || null,

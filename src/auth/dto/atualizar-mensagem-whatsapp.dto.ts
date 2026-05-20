@@ -27,6 +27,16 @@ export class AtualizarMensagemWhatsappDto {
     description: 'Link do Google para avaliação externa do petshop',
     example: 'https://g.page/r/XXXXX/review',
   })
+  @ApiProperty({
+    required: false,
+    example:
+      'Olá, {nome}! 🐾 O {pet} já está prontinho e esperando por você!\n\nPode vir buscar quando quiser. 😊',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  mensagemPetPronto?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500)

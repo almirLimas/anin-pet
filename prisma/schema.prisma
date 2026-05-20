@@ -59,7 +59,9 @@ model Tenant {
   taxaBusca             Decimal?  @db.Decimal(10, 2)
   mensagemAgendamento   String?
   mensagemAvaliacao     String?
+  mensagemPetPronto     String?
   linkGoogle            String?
+  totalGaiolas          Int       @default(10)
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -235,6 +237,16 @@ enum ModalidadeAgendamento {
   PetshopBusca
 }
 
+enum StatusGaiola {
+  Aguardando
+  EmBanho
+  Secando
+  AguardandoBusca
+  AguardandoCliente
+  Pronto
+  Entregue
+}
+
 model Agendamento {
   id             String                 @id @default(cuid())
   dataHora       DateTime
@@ -248,6 +260,9 @@ model Agendamento {
   petId       String
   tenantId    String
   pacoteClienteAtivoId String?
+  avaliacaoAgendarEm   DateTime?
+  gaiola               Int?
+  statusGaiola         StatusGaiola?
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 

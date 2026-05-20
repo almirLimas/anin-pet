@@ -386,6 +386,42 @@ export class EmailService {
     }
   }
 
+  async enviarNotificacaoChatIA(params: {
+    nomePetshop: string;
+    tenantId: string;
+    nomeUsuario: string;
+  }) {
+    const adminEmail = this.config.get<string>(
+      'ADMIN_NOTIFICATION_EMAIL',
+      'josealmirsla@gmail.com',
+    );
+    const { nomePetshop, tenantId, nomeUsuario } = params;
+    const dataHora = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    try {
+      await this.enviar(
+        adminEmail,
+        `🤖 Chat IA aberto — ${nomePetshop}`,
+        `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;">
+          <h2 style="color:#1d9fb6;">Chat Anin IA aberto 🤖</h2>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;">
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;width:140px;">Petshop</td><td style="padding:6px 0;font-size:14px;font-weight:bold;">${nomePetshop}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Usuário</td><td style="padding:6px 0;font-size:14px;">${nomeUsuario}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Tenant ID</td><td style="padding:6px 0;font-size:13px;color:#9ca3af;">${tenantId}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Horário</td><td style="padding:6px 0;font-size:14px;">${dataHora}</td></tr>
+          </table>
+          <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/>
+          <p style="color:#9ca3af;font-size:12px;">AninPet — notificação interna</p>
+        </div>
+      `,
+      );
+    } catch (err) {
+      this.logger.error('Falha ao enviar notificação de chat IA', err);
+    }
+  }
+
   async enviarAlertaVendaPdv(params: {
     nomePetshop: string;
     tenantId: string;

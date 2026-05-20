@@ -15,6 +15,7 @@ import { AuthService } from './auth.service';
 import { AtualizarPerfilDto } from './dto/atualizar-perfil.dto';
 import { AtualizarMetaDto } from './dto/atualizar-meta.dto';
 import { AtualizarTaxaBuscaDto } from './dto/atualizar-taxa-busca.dto';
+import { AtualizarTotalGaiolasDto } from './dto/atualizar-total-gaiolas.dto';
 import { CriarStaffDto } from './dto/criar-staff.dto';
 import { AtualizarStaffDto } from './dto/atualizar-staff.dto';
 import { AtualizarMensagemWhatsappDto } from './dto/atualizar-mensagem-whatsapp.dto';
@@ -90,6 +91,17 @@ export class AuthController {
     @Body() dto: AtualizarTaxaBuscaDto,
   ) {
     return this.authService.atualizarTaxaBusca(req.user.id, dto);
+  }
+
+  @Patch('total-gaiolas')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Atualiza o número total de gaiolas do petshop' })
+  atualizarTotalGaiolas(
+    @Request() req: { user: { id: string } },
+    @Body() dto: AtualizarTotalGaiolasDto,
+  ) {
+    return this.authService.atualizarTotalGaiolas(req.user.id, dto);
   }
 
   @Post('esqueceu-senha')

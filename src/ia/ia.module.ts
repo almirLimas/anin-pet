@@ -6,6 +6,7 @@ import { PetsModule } from '../pets/pets.module';
 import { ServicosModule } from '../servicos/servicos.module';
 import { EstoqueModule } from '../estoque/estoque.module';
 import { AgendaModule } from '../agenda/agenda.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AgendaModule } from '../agenda/agenda.module';
     ServicosModule,
     EstoqueModule,
     AgendaModule,
+    AuthModule,
   ],
   controllers: [IaController],
   providers: [IaService],

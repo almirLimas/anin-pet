@@ -11,6 +11,7 @@ import { PetsService } from '../pets/pets.service';
 import { ServicosService } from '../servicos/servicos.service';
 import { EstoqueService } from '../estoque/estoque.service';
 import { AgendaService } from '../agenda/agenda.service';
+import { EmailService } from '../auth/email.service';
 
 const TOOLS: ChatCompletionTool[] = [
   {
@@ -572,6 +573,8 @@ const TOOLS: ChatCompletionTool[] = [
 export class IaService {
   private readonly logger = new Logger(IaService.name);
   private readonly openai: OpenAI;
+  /** Controla envio de notificação de chat — uma vez por tenant por dia (em memória) */
+  private readonly chatNotificacaoEnviada = new Map<string, string>();
 
   constructor(
     private readonly config: ConfigService,
@@ -581,6 +584,7 @@ export class IaService {
     private readonly servicos: ServicosService,
     private readonly estoque: EstoqueService,
     private readonly agenda: AgendaService,
+    private readonly email: EmailService,
   ) {
     this.openai = new OpenAI({
       apiKey: config.get<string>('OPENAI_API_KEY'),
@@ -590,6 +594,7 @@ export class IaService {
   async chat(
     tenantId: string,
     mensagens: { role: 'user' | 'assistant'; content: string }[],
+    usuarioId?: string,
   ): Promise<{ resposta: string; acoesRealizadas: string[] }> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -599,6 +604,16 @@ export class IaService {
           'Assistente de IA não configurado. Entre em contato com o suporte.',
         acoesRealizadas: [],
       };
+    }
+
+    // Notifica admin na primeira mensagem do dia por tenant (fire-and-forget)
+    const hoje = new Date().toLocaleDateString('sv-SE', {
+      timeZone: 'America/Sao_Paulo',
+    });
+    const chaveNotificacao = `${tenantId}:${hoje}`;
+    if (!this.chatNotificacaoEnviada.has(chaveNotificacao)) {
+      this.chatNotificacaoEnviada.set(chaveNotificacao, '1');
+      this.notificarChatIA(tenantId, usuarioId).catch(() => {});
     }
 
     const agora = new Date().toLocaleString('pt-BR', {
@@ -1785,5 +1800,238 @@ Data e hora atual: ${agora}.`;
       this.logger.error(`Erro na ferramenta ${nome}: ${msg}`);
       return { erro: msg };
     }
+  }
+
+  async getMensagemDiaria(
+    tenantId: string,
+  ): Promise<{ tipo: string; mensagem: string } | null> {
+    // Converte para horário de Brasília (UTC-3)
+    const agora = new Date();
+    const brasiliaMs = agora.getTime() - 3 * 60 * 60 * 1000;
+    const brasilia = new Date(brasiliaMs);
+    const hora = brasilia.getUTCHours();
+    const minuto = brasilia.getUTCMinutes();
+
+    // Disponível apenas a partir das 10:30 (horário de Brasília)
+    if (hora < 10 || (hora === 10 && minuto < 30)) {
+      return null;
+    }
+
+    try {
+      // Dia da semana em Brasília: 0=Dom, 1=Seg … 6=Sáb
+      const dow = brasilia.getUTCDay();
+
+      // Rotação: dias ímpares → semana; pares → pet que não voltou; Dom → meta
+      if (dow === 0) {
+        return (
+          (await this.mensagemMeta(tenantId)) ??
+          (await this.mensagemAtendimentosSemana(tenantId)) ??
+          (await this.mensagemPetNaoVoltou(tenantId))
+        );
+      }
+      if (dow % 2 === 1) {
+        // Seg, Qua, Sex
+        return (
+          (await this.mensagemAtendimentosSemana(tenantId)) ??
+          (await this.mensagemPetNaoVoltou(tenantId)) ??
+          (await this.mensagemMeta(tenantId))
+        );
+      }
+      // Ter, Qui, Sáb
+      return (
+        (await this.mensagemPetNaoVoltou(tenantId)) ??
+        (await this.mensagemAtendimentosSemana(tenantId)) ??
+        (await this.mensagemMeta(tenantId))
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  private async notificarChatIA(
+    tenantId: string,
+    usuarioId?: string,
+  ): Promise<void> {
+    try {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { nome: true },
+      });
+      let nomeUsuario = 'Desconhecido';
+      if (usuarioId) {
+        const usuario = await this.prisma.usuario.findUnique({
+          where: { id: usuarioId },
+          select: { nomeCompleto: true },
+        });
+        if (usuario) nomeUsuario = usuario.nomeCompleto;
+      }
+      await this.email.enviarNotificacaoChatIA({
+        nomePetshop: tenant?.nome ?? tenantId,
+        tenantId,
+        nomeUsuario,
+      });
+    } catch {
+      // silencioso — notificação interna não deve afetar o usuário
+    }
+  }
+
+  private async mensagemAtendimentosSemana(
+    tenantId: string,
+  ): Promise<{ tipo: string; mensagem: string } | null> {
+    const agora = new Date();
+    const brasiliaMs = agora.getTime() - 3 * 60 * 60 * 1000;
+    const brasilia = new Date(brasiliaMs);
+    const dow = brasilia.getUTCDay();
+
+    // Início desta semana (segunda-feira) em Brasília
+    const diasDesdeSegunda = dow === 0 ? 6 : dow - 1;
+    const inicioSemanaAtualBr = new Date(brasiliaMs);
+    inicioSemanaAtualBr.setUTCDate(
+      inicioSemanaAtualBr.getUTCDate() - diasDesdeSegunda,
+    );
+    inicioSemanaAtualBr.setUTCHours(0, 0, 0, 0);
+
+    // Converte de volta para UTC para queries
+    const inicioAtualUTC = new Date(
+      inicioSemanaAtualBr.getTime() + 3 * 60 * 60 * 1000,
+    );
+    const inicioPassadaUTC = new Date(
+      inicioAtualUTC.getTime() - 7 * 24 * 60 * 60 * 1000,
+    );
+    const fimPassadaUTC = new Date(inicioAtualUTC.getTime() - 1);
+
+    const [semanaAtual, semanaPassada] = await Promise.all([
+      this.prisma.agendamento.count({
+        where: {
+          tenantId,
+          dataHora: { gte: inicioAtualUTC, lte: agora },
+          status: { notIn: ['Cancelado', 'NaoCompareceu'] },
+        },
+      }),
+      this.prisma.agendamento.count({
+        where: {
+          tenantId,
+          dataHora: { gte: inicioPassadaUTC, lte: fimPassadaUTC },
+          status: { notIn: ['Cancelado', 'NaoCompareceu'] },
+        },
+      }),
+    ]);
+
+    if (semanaAtual === 0 && semanaPassada === 0) return null;
+
+    const atend = (n: number) => `${n} atendimento${n === 1 ? '' : 's'}`;
+    let mensagem: string;
+
+    if (semanaPassada === 0) {
+      mensagem = `📊 Você já tem ${atend(semanaAtual)} nessa semana. Continue assim! 🐾`;
+    } else {
+      const diff = semanaAtual - semanaPassada;
+      if (diff > 0) {
+        mensagem = `📊 Você teve ${atend(semanaAtual)} essa semana — ${diff} a mais que semana passada! 🐾`;
+      } else if (diff < 0) {
+        mensagem = `📊 Essa semana você tem ${atend(semanaAtual)} — ${Math.abs(diff)} a menos que semana passada. Que tal ativar os lembretes automáticos? 💡`;
+      } else {
+        mensagem = `📊 Você tem ${atend(semanaAtual)} essa semana, igual à semana passada. Consistência é tudo! 💪`;
+      }
+    }
+
+    return { tipo: 'dados', mensagem };
+  }
+
+  private async mensagemPetNaoVoltou(
+    tenantId: string,
+  ): Promise<{ tipo: string; mensagem: string } | null> {
+    const agora = new Date();
+    const limite30 = new Date(agora.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const limite90 = new Date(agora.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    // Agendamentos concluídos de 30-90 dias atrás (um por pet)
+    const candidatos = await this.prisma.agendamento.findMany({
+      where: {
+        tenantId,
+        status: 'Concluido',
+        dataHora: { gte: limite90, lt: limite30 },
+      },
+      select: {
+        petId: true,
+        dataHora: true,
+        pet: { select: { nome: true, raca: true } },
+        cliente: { select: { nome: true } },
+      },
+      orderBy: { dataHora: 'desc' },
+      distinct: ['petId'],
+      take: 20,
+    });
+
+    for (const ag of candidatos) {
+      const maisRecente = await this.prisma.agendamento.count({
+        where: {
+          tenantId,
+          petId: ag.petId,
+          dataHora: { gt: ag.dataHora },
+          status: { notIn: ['Cancelado', 'NaoCompareceu'] },
+        },
+      });
+
+      if (maisRecente === 0) {
+        const dias = Math.floor(
+          (agora.getTime() - ag.dataHora.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        const dataFmt = ag.dataHora.toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          timeZone: 'America/Sao_Paulo',
+        });
+        const raca = ag.pet.raca ? ` (${ag.pet.raca})` : '';
+        return {
+          tipo: 'lembrete',
+          mensagem: `⚠️ ${ag.pet.nome}${raca} do(a) ${ag.cliente.nome} não vem há ${dias} dias (última visita: ${dataFmt}). Que tal enviar um lembrete? 📲`,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private async mensagemMeta(
+    tenantId: string,
+  ): Promise<{ tipo: string; mensagem: string } | null> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { metaMensal: true },
+    });
+
+    if (!tenant?.metaMensal) return null;
+
+    const agora = new Date();
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+
+    const resultado = await this.prisma.lancamento.aggregate({
+      where: {
+        tenantId,
+        tipo: 'Receita',
+        data: { gte: inicioMes, lte: agora },
+      },
+      _sum: { valor: true },
+    });
+
+    const total = Number(resultado._sum.valor ?? 0);
+    const meta = Number(tenant.metaMensal);
+    if (meta <= 0) return null;
+
+    const pct = Math.round((total / meta) * 100);
+    const fmtBRL = (v: number) =>
+      v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    let mensagem: string;
+    if (pct >= 100) {
+      mensagem = `🎉 Parabéns! Você já atingiu ${pct}% da meta mensal de ${fmtBRL(meta)}! Incrível! 🏆`;
+    } else if (pct >= 75) {
+      mensagem = `🎯 Quase lá! Você está em ${pct}% da meta mensal (${fmtBRL(total)} de ${fmtBRL(meta)}). Continue assim! 💪`;
+    } else {
+      mensagem = `📈 Você está em ${pct}% da meta mensal (${fmtBRL(total)} de ${fmtBRL(meta)}). Ainda dá tempo de acelerar! 🚀`;
+    }
+
+    return { tipo: 'meta', mensagem };
   }
 }
