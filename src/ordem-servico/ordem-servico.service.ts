@@ -65,7 +65,7 @@ export class OrdemServicoService {
   ) {
     const servicoIds = servicos.map((as) => as.servico.id);
 
-    // Proteção: se não houver serviços no agendamento, não mexe nos itens
+    // Proteção: se não houver serviços no agendamento, não mexe nos itens.
     if (servicoIds.length === 0) return;
 
     // 1. Remove itens de serviço cujo servicoId não está mais no agendamento
