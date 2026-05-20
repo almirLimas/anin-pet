@@ -68,7 +68,7 @@ export class OrdemServicoService {
     // Proteção: se não houver serviços no agendamento, não mexe nos itens.
     if (servicoIds.length === 0) return;
 
-    // 1. Remove itens de serviço cujo servicoId não está mais no agendamento
+    // 1. Remove itens de serviço cujo servicoId não está mais no agendamento.
     await this.prisma.itemOrdemServico.deleteMany({
       where: {
         ordemServicoId: osId,
