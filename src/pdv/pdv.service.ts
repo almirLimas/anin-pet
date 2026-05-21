@@ -242,6 +242,16 @@ export class PdvService {
       );
   }
 
+  // ─── Buscar produto por código de barras (scan de etiqueta) ──
+
+  async buscarPorBarcode(tenantId: string, codigo: string) {
+    const produto = await this.prisma.produto.findFirst({
+      where: { tenantId, codigoBarras: codigo, ativo: true },
+    });
+    if (!produto) throw new NotFoundException('Produto não encontrado para este código de barras');
+    return produto;
+  }
+
   // ─── Listar vendas ──────────────────────────────────────────
 
   async listar(

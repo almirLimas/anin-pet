@@ -21,6 +21,14 @@ import { CreateVendaDto } from './dto/create-venda.dto';
 export class PdvController {
   constructor(private readonly pdvService: PdvService) {}
 
+  @Get('produto-barcode/:codigo')
+  buscarPorBarcode(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('codigo') codigo: string,
+  ) {
+    return this.pdvService.buscarPorBarcode(usuario.tenantId, codigo);
+  }
+
   @Post('vendas')
   fecharVenda(
     @UsuarioAtual() usuario: { tenantId: string },
