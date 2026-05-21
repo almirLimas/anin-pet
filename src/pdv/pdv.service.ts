@@ -245,23 +245,42 @@ export class PdvService {
   // ─── Buscar produto por código de barras (scan de etiqueta) ──
 
   /**
-   * Detecta etiqueta de balança no padrão EAN-13 com prefixo "2":
-   *   2 PPPPP WWWWW C
-   *   ^       ^^^^^
-   *   prefix  peso em gramas (÷1000 = kg)
-   * Retorna o produto + quantidadeBalanca (kg) quando aplicável.
+   * Suporta dois formatos de etiqueta de balança EAN-13 com prefixo "2":
+   *
+   * Formato A — PLU 6 dígitos + preço (ex: Filizola/Toledo com preço embutido):
+   *   2 PPPPPP VVVVV C   → PLU=pos2-7, preço_centavos=pos8-12, check=pos13
+   *   Exemplo: 2993600003701 → PLU=993600, preço=R$3,70
+   *
+   * Formato B — PLU 5 dígitos + peso em gramas:
+   *   2 PPPPP WWWWW CC   → PLU=pos2-6, peso_gramas=pos7-11, checks=pos12-13
    */
-  private parsearEtiquetaBalanca(
-    codigo: string,
-  ): { plu: string; quantidadeKg: number } | null {
-    if (codigo.length === 13 && codigo.startsWith('2')) {
-      const plu = codigo.substring(1, 6); // 5 dígitos do produto
-      const pesoStr = codigo.substring(6, 11); // 5 dígitos do peso em gramas
-      const pesoGramas = Number.parseInt(pesoStr, 10);
-      if (!Number.isNaN(pesoGramas) && pesoGramas > 0) {
-        return { plu, quantidadeKg: pesoGramas / 1000 };
-      }
+  private parsearEtiquetaBalanca(codigo: string): {
+    plu: string;
+    precoBalanca: number | null;
+    quantidadeKg: number | null;
+  } | null {
+    if (codigo.length !== 13 || !codigo.startsWith('2')) return null;
+
+    // Formato A: PLU 6 dígitos + preço embutido
+    const plu6 = codigo.substring(1, 7);
+    const precoStr = codigo.substring(7, 12);
+    const precoCentavos = Number.parseInt(precoStr, 10);
+    if (!Number.isNaN(precoCentavos) && precoCentavos > 0) {
+      return {
+        plu: plu6,
+        precoBalanca: precoCentavos / 100,
+        quantidadeKg: null,
+      };
     }
+
+    // Formato B: PLU 5 dígitos + peso em gramas
+    const plu5 = codigo.substring(1, 6);
+    const pesoStr = codigo.substring(6, 11);
+    const pesoGramas = Number.parseInt(pesoStr, 10);
+    if (!Number.isNaN(pesoGramas) && pesoGramas > 0) {
+      return { plu: plu5, precoBalanca: null, quantidadeKg: pesoGramas / 1000 };
+    }
+
     return null;
   }
 
@@ -271,7 +290,7 @@ export class PdvService {
       where: { tenantId, codigoBarras: codigo, ativo: true },
     });
     if (produtoExato) {
-      return { ...produtoExato, quantidadeBalanca: null };
+      return { ...produtoExato, quantidadeBalanca: null, precoBalanca: null };
     }
 
     // 2. Tenta interpretar como etiqueta de balança (EAN-13 prefixo 2)
@@ -281,7 +300,11 @@ export class PdvService {
         where: { tenantId, codigoBarras: balanca.plu, ativo: true },
       });
       if (produto) {
-        return { ...produto, quantidadeBalanca: balanca.quantidadeKg };
+        return {
+          ...produto,
+          quantidadeBalanca: balanca.quantidadeKg,
+          precoBalanca: balanca.precoBalanca,
+        };
       }
     }
 
