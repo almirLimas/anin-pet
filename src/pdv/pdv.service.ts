@@ -248,7 +248,10 @@ export class PdvService {
     const produto = await this.prisma.produto.findFirst({
       where: { tenantId, codigoBarras: codigo, ativo: true },
     });
-    if (!produto) throw new NotFoundException('Produto não encontrado para este código de barras');
+    if (!produto)
+      throw new NotFoundException(
+        'Produto não encontrado para este código de barras',
+      );
     return produto;
   }
 
