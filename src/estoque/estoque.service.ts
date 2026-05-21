@@ -3,11 +3,22 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { parseStringPromise } from 'xml2js';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProdutoDto } from './dto/create-produto.dto';
 import { UpdateProdutoDto } from './dto/update-produto.dto';
 import { CreateMovimentacaoDto } from './dto/create-movimentacao.dto';
 import { CreateEntradaMercadoriaDto } from './dto/create-entrada-mercadoria.dto';
+
+export interface NfeItemPreview {
+  nomeNfe: string;
+  eanNfe: string;
+  codigoProdutoNfe: string;
+  quantidade: number;
+  precoUnitario: number;
+  produtoId: string | null;
+  produtoNome: string | null;
+}
 
 @Injectable()
 export class EstoqueService {
@@ -238,5 +249,86 @@ export class EstoqueService {
 
       return entrada;
     });
+  }
+
+  // ─── Parse NF-e XML ─────────────────────────────────────────
+
+  async parseNfeXml(
+    tenantId: string,
+    xml: string,
+  ): Promise<{ emitente: string; itens: NfeItemPreview[] }> {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = await parseStringPromise(xml, {
+        explicitArray: false,
+        ignoreAttrs: false,
+        tagNameProcessors: [(name) => name.replace(/^.*:/, '')],
+      });
+    } catch {
+      throw new BadRequestException('XML inválido ou corrompido');
+    }
+
+    // Suporta nfeProc > NFe e NFe direto
+    const nfeProc = parsed['nfeProc'] as Record<string, unknown> | undefined;
+    const nfe = (nfeProc?.['NFe'] ?? parsed['NFe']) as
+      | Record<string, unknown>
+      | undefined;
+    if (!nfe) throw new BadRequestException('Arquivo não é uma NF-e válida');
+
+    const infNFe = nfe['infNFe'] as Record<string, unknown>;
+    if (!infNFe) throw new BadRequestException('NF-e sem infNFe');
+
+    const emit = infNFe['emit'] as Record<string, unknown>;
+    const xNome = emit?.['xNome'];
+    const emitente =
+      typeof xNome === 'string' ? xNome : 'Fornecedor desconhecido';
+
+    const detRaw = infNFe['det'];
+    const dets: Record<string, unknown>[] = Array.isArray(detRaw)
+      ? (detRaw as Record<string, unknown>[])
+      : [detRaw as Record<string, unknown>];
+
+    // Busca todos os produtos do tenant para tentar vincular por EAN ou código
+    const produtosTenant = await this.prisma.produto.findMany({
+      where: { tenantId, ativo: true },
+      select: { id: true, nome: true, codigoBarras: true },
+    });
+
+    const toStr = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+    const itens: NfeItemPreview[] = dets
+      .filter((d) => d?.['prod'])
+      .map((d) => {
+        const prod = d['prod'] as Record<string, unknown>;
+        const nomeNfe = toStr(prod['xProd']);
+        const eanNfe = toStr(prod['cEAN']).replace(/\D/g, '');
+        const codigoProdutoNfe = toStr(prod['cProd']);
+        const quantidade = Number(prod['qCom'] ?? 0);
+        const precoUnitario = Number(prod['vUnCom'] ?? 0);
+
+        // Tenta vincular: 1) por EAN, 2) por código de produto
+        const vinculado =
+          (eanNfe
+            ? produtosTenant.find(
+                (p) => p.codigoBarras && p.codigoBarras === eanNfe,
+              )
+            : null) ??
+          produtosTenant.find(
+            (p) => p.codigoBarras && p.codigoBarras === codigoProdutoNfe,
+          ) ??
+          null;
+
+        return {
+          nomeNfe,
+          eanNfe,
+          codigoProdutoNfe,
+          quantidade,
+          precoUnitario,
+          produtoId: vinculado?.id ?? null,
+          produtoNome: vinculado?.nome ?? null,
+        };
+      });
+
+    return { emitente, itens };
   }
 }

@@ -10,9 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { IsString } from 'class-validator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { EstoqueService } from './estoque.service';
+
+class ParseNfeDto {
+  @IsString()
+  xml: string;
+}
 import { CreateProdutoDto } from './dto/create-produto.dto';
 import { UpdateProdutoDto } from './dto/update-produto.dto';
 import { CreateMovimentacaoDto } from './dto/create-movimentacao.dto';
@@ -122,6 +128,14 @@ export class EstoqueController {
     @Param('id') id: string,
   ) {
     return this.estoqueService.findOneEntrada(usuario.tenantId, id);
+  }
+
+  @Post('entradas/parse-xml')
+  parseNfeXml(
+    @Body() dto: ParseNfeDto,
+    @UsuarioAtual() usuario: { tenantId: string },
+  ) {
+    return this.estoqueService.parseNfeXml(usuario.tenantId, dto.xml);
   }
 
   @Post('entradas')
