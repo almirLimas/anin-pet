@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-echo "Sincronizando schema com o banco..."
-npx prisma db push --skip-generate
+echo "Rodando migrations..."
+npx prisma migrate deploy
 
 echo "Rodando seed..."
 npx prisma db seed
