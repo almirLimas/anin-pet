@@ -23,7 +23,9 @@ export class AdminService {
       await this.ativarAvisoPix(t.id, 72); // 72h para pagar
     }
 
-    this.logger.log(`Aviso PIX mensal ativado para ${tenants.length} tenant(s)`);
+    this.logger.log(
+      `Aviso PIX mensal ativado para ${tenants.length} tenant(s)`,
+    );
   }
 
   async ativarAvisoPix(tenantId: string, horas = 48) {
