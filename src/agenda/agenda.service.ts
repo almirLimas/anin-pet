@@ -172,11 +172,19 @@ export class AgendaService {
   }
 
   async create(tenantId: string, dto: CreateAgendamentoDto) {
-    const { servicoIds, taxaBusca, dataHora, pacoteClienteAtivoId, ...rest } =
-      dto;
+    const {
+      servicoIds,
+      taxaBusca,
+      dataHora,
+      pacoteClienteAtivoId,
+      gaiola: gaiolaRequisitada,
+      ...rest
+    } = dto;
 
-    // Auto-atribui a próxima gaiola livre do dia
-    const gaiola = await this._proxGaiolaLivre(tenantId, new Date(dataHora));
+    // Usa a gaiola solicitada se informada, senão auto-atribui a próxima livre
+    const gaiola =
+      gaiolaRequisitada ??
+      (await this._proxGaiolaLivre(tenantId, new Date(dataHora)));
 
     const agendamento = await this.prisma.agendamento.create({
       data: {

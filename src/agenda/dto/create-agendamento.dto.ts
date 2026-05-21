@@ -73,4 +73,14 @@ export class CreateAgendamentoDto {
   @IsOptional()
   @IsString()
   pacoteClienteAtivoId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Número da gaiola a atribuir (ignora auto-assign se informado)',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Type(() => Number)
+  gaiola?: number;
 }
