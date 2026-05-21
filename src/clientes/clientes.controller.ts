@@ -43,6 +43,11 @@ export class ClientesController {
     );
   }
 
+  @Get('avisos-mensalidade')
+  avisosMensalidade(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.clientesService.avisosMensalidade(usuario.tenantId);
+  }
+
   @Get(':id')
   findOne(
     @UsuarioAtual() usuario: { tenantId: string },
@@ -74,6 +79,14 @@ export class ClientesController {
     @Param('id') id: string,
   ) {
     return this.clientesService.pagarMensalidade(usuario.tenantId, id);
+  }
+
+  @Post(':id/gerar-pix-mensalidade')
+  gerarPixMensalidade(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Param('id') id: string,
+  ) {
+    return this.clientesService.gerarPixMensalidade(usuario.tenantId, id);
   }
 
   @Delete(':id')

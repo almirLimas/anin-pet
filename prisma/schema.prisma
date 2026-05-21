@@ -55,6 +55,7 @@ model Tenant {
   avisoTrial1dEnviadoEm DateTime?
   mpAssinaturaId   String?
   mpPagamentoId    String?
+  avisoPixAte      DateTime?
   metaMensal            Decimal?  @db.Decimal(10, 2)
   taxaBusca             Decimal?  @db.Decimal(10, 2)
   mensagemAgendamento   String?

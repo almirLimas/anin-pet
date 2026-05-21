@@ -43,6 +43,7 @@ export class AuthService {
             plano: true,
             assinaturaStatus: true,
             trialExpiraEm: true,
+            avisoPixAte: true,
           },
         },
       },
@@ -78,6 +79,7 @@ export class AuthService {
         plano: usuario.tenant.plano,
         assinaturaStatus: usuario.tenant.assinaturaStatus,
         trialExpiraEm: usuario.tenant.trialExpiraEm,
+        avisoPixAte: usuario.tenant.avisoPixAte,
       },
     };
   }
@@ -256,6 +258,7 @@ export class AuthService {
             plano: true,
             assinaturaStatus: true,
             trialExpiraEm: true,
+            avisoPixAte: true,
             metaMensal: true,
             taxaBusca: true,
             totalGaiolas: true,
@@ -272,6 +275,7 @@ export class AuthService {
       plano: usuario.tenant.plano,
       assinaturaStatus: usuario.tenant.assinaturaStatus,
       trialExpiraEm: usuario.tenant.trialExpiraEm,
+      avisoPixAte: usuario.tenant.avisoPixAte,
       metaMensal: usuario.tenant.metaMensal
         ? Number(usuario.tenant.metaMensal)
         : null,

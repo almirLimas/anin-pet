@@ -1,9 +1,47 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  // Todo dia 22 à meia-noite: ativa aviso PIX para tenants sem assinatura por cartão
+  @Cron('0 0 22 * *')
+  async ativarAvisoPixMensal() {
+    const tenants = await this.prisma.tenant.findMany({
+      where: {
+        assinaturaStatus: { in: ['ativa', 'trial'] },
+        mpAssinaturaId: null, // apenas quem NÃO paga por cartão (PreApproval)
+      },
+      select: { id: true },
+    });
+
+    for (const t of tenants) {
+      await this.ativarAvisoPix(t.id, 72); // 72h para pagar
+    }
+
+    this.logger.log(`Aviso PIX mensal ativado para ${tenants.length} tenant(s)`);
+  }
+
+  async ativarAvisoPix(tenantId: string, horas = 48) {
+    const ate = new Date(Date.now() + horas * 60 * 60 * 1000);
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { avisoPixAte: ate },
+    });
+    return { tenantId, avisoPixAte: ate.toISOString() };
+  }
+
+  async desativarAvisoPix(tenantId: string) {
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { avisoPixAte: null },
+    });
+    return { tenantId, avisoPixAte: null };
+  }
 
   async gerarGoogleAdsCsv(): Promise<string> {
     const usuarios = await this.prisma.usuario.findMany({

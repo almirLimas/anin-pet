@@ -2,14 +2,21 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  InternalServerErrorException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { UpdateClienteDto } from './dto/update-cliente.dto';
 
 @Injectable()
 export class ClientesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async findAll(tenantId: string, page = 1, limit = 20, busca?: string) {
     const skip = (page - 1) * limit;
@@ -172,5 +179,95 @@ export class ClientesService {
         },
       });
     });
+  }
+
+  async avisosMensalidade(tenantId: string) {
+    const hoje = new Date();
+    const diaHoje = hoje.getDate();
+    const anoHoje = hoje.getFullYear();
+    const mesHoje = hoje.getMonth();
+
+    const clientes = await this.prisma.cliente.findMany({
+      where: {
+        tenantId,
+        mensalista: true,
+        diaVencimento: diaHoje,
+        valorMensal: { gt: 0 },
+      },
+      select: {
+        id: true,
+        nome: true,
+        valorMensal: true,
+        diaVencimento: true,
+        ultimaMensalidadePaga: true,
+      },
+    });
+
+    // Filtra quem ainda não pagou neste mês
+    return clientes.filter((c) => {
+      if (!c.ultimaMensalidadePaga) return true;
+      const ultima = new Date(c.ultimaMensalidadePaga);
+      return ultima.getFullYear() !== anoHoje || ultima.getMonth() !== mesHoje;
+    });
+  }
+
+  async gerarPixMensalidade(tenantId: string, clienteId: string) {
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id: clienteId, tenantId },
+    });
+
+    if (!cliente) throw new NotFoundException('Cliente não encontrado');
+    if (!cliente.mensalista)
+      throw new UnprocessableEntityException('Cliente não é mensalista');
+
+    const valor = Number(cliente.valorMensal ?? 0);
+    if (valor <= 0)
+      throw new UnprocessableEntityException(
+        'Cliente mensalista sem valor mensal configurado',
+      );
+
+    const accessToken = this.config.getOrThrow<string>('MP_ACCESS_TOKEN');
+    const apiUrl = this.config.getOrThrow<string>('BASE_URL');
+    const mpClient = new MercadoPagoConfig({ accessToken });
+
+    try {
+      const payment = new Payment(mpClient);
+      const result = await payment.create({
+        body: {
+          transaction_amount: valor,
+          payment_method_id: 'pix',
+          description: `Mensalidade - ${cliente.nome}`,
+          date_of_expiration: new Date(
+            Date.now() + 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          payer: {
+            email: cliente.email ?? `cliente-${cliente.id}@noreply.aninpet.com`,
+            ...(cliente.cpf && {
+              identification: {
+                type: 'CPF',
+                number: cliente.cpf.replaceAll(/\D/g, ''),
+              },
+            }),
+          },
+          external_reference: `mensalidade:${clienteId}`,
+          notification_url: `${apiUrl}/pagamento/webhook`,
+        },
+      });
+
+      const txData = result.point_of_interaction?.transaction_data;
+
+      return {
+        qrCode: txData?.qr_code ?? '',
+        qrCodeBase64: txData?.qr_code_base64 ?? '',
+        valor,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      };
+    } catch (err) {
+      throw new InternalServerErrorException(
+        `Erro ao gerar PIX: ${
+          err instanceof Error ? err.message : JSON.stringify(err)
+        }`,
+      );
+    }
   }
 }

@@ -71,4 +71,13 @@ export class PagamentoController {
   ) {
     return this.pagamentoService.trocarPlano(usuario.tenantId, dto.plano!);
   }
+
+  @Post('gerar-pix-mensal')
+  @UseGuards(JwtAuthGuard)
+  gerarPixMensal(@UsuarioAtual() usuario: JwtPayload) {
+    return this.pagamentoService.gerarPixMensal(
+      usuario.tenantId,
+      usuario.email,
+    );
+  }
 }

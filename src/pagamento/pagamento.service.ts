@@ -219,6 +219,49 @@ export class PagamentoService {
     }
   }
 
+  async gerarPixMensal(tenantId: string, email: string) {
+    const tenant = await this.prisma.tenant.findUniqueOrThrow({
+      where: { id: tenantId },
+      select: { plano: true },
+    });
+    const valor = PRECO_PLANO[tenant.plano];
+    const nome = NOME_PLANO[tenant.plano];
+    const apiUrl = this.config.getOrThrow<string>('BASE_URL');
+
+    try {
+      const payment = new Payment(this.mpClient);
+      const result = await payment.create({
+        body: {
+          transaction_amount: valor,
+          payment_method_id: 'pix',
+          description: `Mensalidade ${nome} - Anin Pet`,
+          date_of_expiration: new Date(
+            Date.now() + 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          payer: { email },
+          external_reference: `mensal:${tenantId}`,
+          notification_url: `${apiUrl}/pagamento/webhook`,
+        },
+      });
+
+      const txData = result.point_of_interaction?.transaction_data;
+      return {
+        qrCode: txData?.qr_code ?? '',
+        qrCodeBase64: txData?.qr_code_base64 ?? '',
+        valor,
+        plano: tenant.plano,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('Erro ao gerar PIX mensal', err);
+      throw new InternalServerErrorException(
+        `Erro ao gerar PIX: ${
+          err instanceof Error ? err.message : JSON.stringify(err)
+        }`,
+      );
+    }
+  }
+
   private async criarPix(
     plano: Plano,
     tenantId: string,
@@ -336,9 +379,47 @@ export class PagamentoService {
     const payment = new Payment(this.mpClient);
     const result = await payment.get({ id: paymentId });
 
-    const tenantId = result.external_reference;
-    if (!tenantId) return;
+    const externalRef = result.external_reference;
+    if (!externalRef) return;
 
+    // PIX mensal da plataforma: external_reference = "mensal:{tenantId}"
+    if (externalRef.startsWith('mensal:')) {
+      const tenantId = externalRef.slice('mensal:'.length);
+      if (!tenantId) return;
+
+      if (result.status === 'approved') {
+        const expiraEm = new Date();
+        expiraEm.setMonth(expiraEm.getMonth() + 1);
+
+        await this.prisma.tenant.update({
+          where: { id: tenantId },
+          data: {
+            assinaturaStatus: AssinaturaStatus.ativa,
+            avisoPixAte: null,
+            trialExpiraEm: expiraEm,
+          },
+        });
+        this.logger.log(
+          `PIX mensal aprovado: tenant ${tenantId} → ativa até ${expiraEm.toISOString()}`,
+        );
+      } else {
+        this.logger.log(
+          `PIX mensal não aprovado (${result.status}): tenant ${tenantId}`,
+        );
+      }
+      return;
+    }
+
+    // Pagamento de mensalidade de cliente do petshop: external_reference = "mensalidade:{clienteId}"
+    if (externalRef.startsWith('mensalidade:')) {
+      this.logger.log(
+        `Pagamento de cliente recebido (${result.status}): ${externalRef}`,
+      );
+      return;
+    }
+
+    // PIX anual ou outros pagamentos diretos: external_reference = tenantId
+    const tenantId = externalRef;
     const status =
       result.status === 'approved'
         ? AssinaturaStatus.ativa

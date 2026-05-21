@@ -1,4 +1,13 @@
-import { Controller, Get, Header, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { AdminApiKeyGuard } from './admin-api-key.guard';
 import { AdminService } from './admin.service';
@@ -22,5 +31,17 @@ export class AdminController {
   })
   async googleAdsCsv(): Promise<string> {
     return this.adminService.gerarGoogleAdsCsv();
+  }
+
+  @Post('tenants/:id/ativar-aviso-pix')
+  @ApiOperation({ summary: 'Ativa banner de cobrança PIX para um tenant' })
+  ativarAvisoPix(@Param('id') id: string, @Query('horas') horas?: string) {
+    return this.adminService.ativarAvisoPix(id, horas ? Number(horas) : 48);
+  }
+
+  @Delete('tenants/:id/ativar-aviso-pix')
+  @ApiOperation({ summary: 'Remove banner de cobrança PIX de um tenant' })
+  desativarAvisoPix(@Param('id') id: string) {
+    return this.adminService.desativarAvisoPix(id);
   }
 }
