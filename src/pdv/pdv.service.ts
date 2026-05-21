@@ -244,15 +244,50 @@ export class PdvService {
 
   // ─── Buscar produto por código de barras (scan de etiqueta) ──
 
+  /**
+   * Detecta etiqueta de balança no padrão EAN-13 com prefixo "2":
+   *   2 PPPPP WWWWW C
+   *   ^       ^^^^^
+   *   prefix  peso em gramas (÷1000 = kg)
+   * Retorna o produto + quantidadeBalanca (kg) quando aplicável.
+   */
+  private parsearEtiquetaBalanca(
+    codigo: string,
+  ): { plu: string; quantidadeKg: number } | null {
+    if (codigo.length === 13 && codigo.startsWith('2')) {
+      const plu = codigo.substring(1, 6); // 5 dígitos do produto
+      const pesoStr = codigo.substring(6, 11); // 5 dígitos do peso em gramas
+      const pesoGramas = Number.parseInt(pesoStr, 10);
+      if (!Number.isNaN(pesoGramas) && pesoGramas > 0) {
+        return { plu, quantidadeKg: pesoGramas / 1000 };
+      }
+    }
+    return null;
+  }
+
   async buscarPorBarcode(tenantId: string, codigo: string) {
-    const produto = await this.prisma.produto.findFirst({
+    // 1. Tenta match exato no campo codigoBarras
+    const produtoExato = await this.prisma.produto.findFirst({
       where: { tenantId, codigoBarras: codigo, ativo: true },
     });
-    if (!produto)
-      throw new NotFoundException(
-        'Produto não encontrado para este código de barras',
-      );
-    return produto;
+    if (produtoExato) {
+      return { ...produtoExato, quantidadeBalanca: null };
+    }
+
+    // 2. Tenta interpretar como etiqueta de balança (EAN-13 prefixo 2)
+    const balanca = this.parsearEtiquetaBalanca(codigo);
+    if (balanca) {
+      const produto = await this.prisma.produto.findFirst({
+        where: { tenantId, codigoBarras: balanca.plu, ativo: true },
+      });
+      if (produto) {
+        return { ...produto, quantidadeBalanca: balanca.quantidadeKg };
+      }
+    }
+
+    throw new NotFoundException(
+      'Produto não encontrado para este código de barras',
+    );
   }
 
   // ─── Listar vendas ──────────────────────────────────────────
