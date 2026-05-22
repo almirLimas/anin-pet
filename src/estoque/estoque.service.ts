@@ -31,12 +31,13 @@ export class EstoqueService {
       where: busca
         ? {
             tenantId,
+            ativo: true,
             OR: [
               { nome: { contains: busca, mode: 'insensitive' as const } },
               { codigoBarras: { contains: busca } },
             ],
           }
-        : { tenantId },
+        : { tenantId, ativo: true },
       orderBy: { nome: 'asc' },
     });
 
@@ -64,7 +65,10 @@ export class EstoqueService {
 
   async removeProduto(tenantId: string, id: string) {
     await this.findOneProduto(tenantId, id);
-    return this.prisma.produto.delete({ where: { id } });
+    return this.prisma.produto.update({
+      where: { id },
+      data: { ativo: false },
+    });
   }
 
   // ─── Movimentações ──────────────────────────────────────────
@@ -186,7 +190,7 @@ export class EstoqueService {
     // Validar que todos os produtos existem no tenant
     const produtoIds = dto.itens.map((i) => i.produtoId);
     const produtos = await this.prisma.produto.findMany({
-      where: { tenantId, id: { in: produtoIds } },
+      where: { tenantId, ativo: true, id: { in: produtoIds } },
       select: { id: true, nome: true },
     });
     if (produtos.length !== produtoIds.length) {
