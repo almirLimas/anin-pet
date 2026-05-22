@@ -253,6 +253,36 @@ export class PdvService {
     tamValor: 5,
   };
 
+  // Presets para detecção automática quando houver etiquetas de layouts mistos.
+  private static readonly CONFIG_BALANCA_URANO = {
+    prefixo: '2',
+    posCodigo: 2,
+    tamCodigo: 5,
+    posValor: 7,
+    tamValor: 5,
+  };
+
+  private configsBalancaDeteccao(
+    cfgTenant: typeof PdvService.CONFIG_BALANCA_PADRAO,
+  ): Array<typeof PdvService.CONFIG_BALANCA_PADRAO> {
+    const candidatas = [
+      cfgTenant,
+      PdvService.CONFIG_BALANCA_PADRAO,
+      PdvService.CONFIG_BALANCA_URANO,
+    ];
+
+    const chave = (c: typeof PdvService.CONFIG_BALANCA_PADRAO) =>
+      `${c.prefixo}-${c.posCodigo}-${c.tamCodigo}-${c.posValor}-${c.tamValor}`;
+
+    const vistas = new Set<string>();
+    return candidatas.filter((c) => {
+      const k = chave(c);
+      if (vistas.has(k)) return false;
+      vistas.add(k);
+      return true;
+    });
+  }
+
   private resolverConfigBalanca(
     raw: unknown,
   ): typeof PdvService.CONFIG_BALANCA_PADRAO {
@@ -324,22 +354,40 @@ export class PdvService {
       where: { id: tenantId },
       select: { configuracaoBalanca: true },
     });
-    const cfg = this.resolverConfigBalanca(tenant?.configuracaoBalanca);
-    const balanca = this.parsearEtiquetaBalanca(codigo, cfg);
+    const cfgTenant = this.resolverConfigBalanca(tenant?.configuracaoBalanca);
+    const configs = this.configsBalancaDeteccao(cfgTenant);
 
-    if (balanca) {
-      const produto = await this.prisma.produto.findFirst({
-        where: { tenantId, codigoBarras: balanca.plu, ativo: true },
-      });
-      if (produto) {
-        return {
-          ...produto,
-          quantidadeBalanca: balanca.quantidadeKg,
-          precoBalanca: balanca.precoBalanca,
-        };
+    const tentativas = configs
+      .map((cfg) => this.parsearEtiquetaBalanca(codigo, cfg))
+      .filter(
+        (
+          t,
+        ): t is {
+          plu: string;
+          precoBalanca: number | null;
+          quantidadeKg: number | null;
+        } => t !== null,
+      );
+
+    if (tentativas.length > 0) {
+      for (const balanca of tentativas) {
+        const produto = await this.prisma.produto.findFirst({
+          where: { tenantId, codigoBarras: balanca.plu, ativo: true },
+        });
+        if (produto) {
+          return {
+            ...produto,
+            quantidadeBalanca: balanca.quantidadeKg,
+            precoBalanca: balanca.precoBalanca,
+          };
+        }
       }
+
+      const plusTentados = Array.from(
+        new Set(tentativas.map((t) => t.plu)),
+      ).join(', ');
       throw new NotFoundException(
-        `Etiqueta de balança detectada — PLU "${balanca.plu}" não está cadastrado. Abra o produto correto e salve o Código de Barras como "${balanca.plu}".`,
+        `Etiqueta de balança detectada, mas nenhum PLU foi encontrado no cadastro. PLUs testados: ${plusTentados}. Abra o produto correto e salve o Código de Barras como o PLU da sua balança.`,
       );
     }
 

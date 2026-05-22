@@ -444,13 +444,14 @@ export class EstoqueService {
     if (listaRaw.length > 0) {
       const itens: NfeItemPreview[] = listaRaw
         .map((item) => {
-          const { nome, codigo, preco, quantidade } =
+          const { nome, codigo, ean, preco, quantidade } =
             this.mapearCamposItem(item);
-          const vinculado = vincular('', codigo);
+          const codigoPrincipal = codigo || ean;
+          const vinculado = vincular(ean, codigoPrincipal);
           return {
             nomeNfe: nome,
-            eanNfe: '',
-            codigoProdutoNfe: codigo,
+            eanNfe: ean,
+            codigoProdutoNfe: codigoPrincipal,
             quantidade,
             precoUnitario: preco,
             produtoId: vinculado?.id ?? null,
@@ -557,6 +558,7 @@ export class EstoqueService {
   private mapearCamposItem(item: Record<string, unknown>): {
     nome: string;
     codigo: string;
+    ean: string;
     preco: number;
     quantidade: number;
   } {
@@ -610,15 +612,21 @@ export class EstoqueService {
         'codigo',
         'code',
         'cod',
-        'ean',
-        'barcode',
-        'codigoBarras',
-        'cEAN',
+        'codigoProduto',
+        'codigo_produto',
         'cProd',
         'sku',
         'id',
         'ref',
         'referencia',
+      ),
+      ean: encontrar(
+        'ean',
+        'barcode',
+        'codigoBarraBalanca',
+        'codigo_barra_balanca',
+        'codigoBarras',
+        'cEAN',
         'gtin',
       ),
       preco: encontrarNum(
@@ -638,20 +646,31 @@ export class EstoqueService {
         'precoVenda',
         'precovenda',
       ),
-      quantidade: encontrarNum(
-        'estoque',
-        'quantidade',
-        'qtd',
-        'quantity',
-        'qty',
-        'qCom',
-        'stock',
-        'quant',
-        'saldo',
-        'amount',
-        'inventario',
-        'inventory',
-      ),
+      quantidade: (() => {
+        const quantidade = encontrarNum(
+          'estoque',
+          'quantidade',
+          'qtd',
+          'quantity',
+          'qty',
+          'qCom',
+          'stock',
+          'quant',
+          'saldo',
+          'amount',
+          'inventario',
+          'inventory',
+          'pesoKg',
+          'peso_kg',
+          'peso',
+          'weightKg',
+          'weight_kg',
+          'weight',
+        );
+
+        if (quantidade > 0) return quantidade;
+        return 1;
+      })(),
     };
   }
 }
