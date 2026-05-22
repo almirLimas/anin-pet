@@ -23,6 +23,8 @@ import { CriarStaffDto } from './dto/criar-staff.dto';
 import { AtualizarStaffDto } from './dto/atualizar-staff.dto';
 import { EmailService } from './email.service';
 
+const TENANTS_AVISO_PIX = new Set(['cmnoxsbbc000001qlo134gm04']);
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -31,6 +33,11 @@ export class AuthService {
     private readonly email: EmailService,
     private readonly config: ConfigService,
   ) {}
+
+  private avisoPixPermitido(tenantId: string, avisoPixAte: Date | null) {
+    if (!TENANTS_AVISO_PIX.has(tenantId)) return null;
+    return avisoPixAte;
+  }
 
   async login(dto: LoginDto) {
     const usuario = await this.prisma.usuario.findUnique({
@@ -79,7 +86,10 @@ export class AuthService {
         plano: usuario.tenant.plano,
         assinaturaStatus: usuario.tenant.assinaturaStatus,
         trialExpiraEm: usuario.tenant.trialExpiraEm,
-        avisoPixAte: usuario.tenant.avisoPixAte,
+        avisoPixAte: this.avisoPixPermitido(
+          usuario.tenantId,
+          usuario.tenant.avisoPixAte,
+        ),
       },
     };
   }
@@ -275,7 +285,10 @@ export class AuthService {
       plano: usuario.tenant.plano,
       assinaturaStatus: usuario.tenant.assinaturaStatus,
       trialExpiraEm: usuario.tenant.trialExpiraEm,
-      avisoPixAte: usuario.tenant.avisoPixAte,
+      avisoPixAte: this.avisoPixPermitido(
+        usuario.tenantId,
+        usuario.tenant.avisoPixAte,
+      ),
       metaMensal: usuario.tenant.metaMensal
         ? Number(usuario.tenant.metaMensal)
         : null,
