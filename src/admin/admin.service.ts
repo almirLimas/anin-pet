@@ -2,17 +2,25 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
+const TENANTS_AVISO_PIX_MENSAL = ['cmnoxsbbc000001qlo134gm04'];
+
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // Todo dia 22 à meia-noite: ativa aviso PIX para tenants sem assinatura por cartão
+  // Executa no dia 22 à meia-noite: ativa aviso PIX para tenants sem assinatura por cartão
   @Cron('0 0 22 * *')
   async ativarAvisoPixMensal() {
+    if (TENANTS_AVISO_PIX_MENSAL.length === 0) {
+      this.logger.warn('Aviso PIX mensal sem tenants configurados');
+      return;
+    }
+
     const tenants = await this.prisma.tenant.findMany({
       where: {
+        id: { in: TENANTS_AVISO_PIX_MENSAL },
         assinaturaStatus: { in: ['ativa', 'trial'] },
         mpAssinaturaId: null, // apenas quem NÃO paga por cartão (PreApproval)
       },
