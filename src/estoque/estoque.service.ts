@@ -251,7 +251,119 @@ export class EstoqueService {
     });
   }
 
-  // ─── Parse NF-e XML ─────────────────────────────────────────
+  // ─── Importar NF-e (criar produtos + entrada) ───────────────
+
+  async importarNfe(
+    tenantId: string,
+    usuarioId: string,
+    dto: {
+      fornecedorId?: string;
+      observacoes?: string;
+      itens: Array<{
+        produtoId?: string;
+        nomeNfe?: string;
+        eanNfe?: string;
+        codigoProdutoNfe?: string;
+        quantidade: number;
+        precoUnitario: number;
+      }>;
+    },
+  ) {
+    const numero = await this.proximoNumeroEntrada(tenantId);
+
+    return this.prisma.$transaction(async (tx) => {
+      // Resolve produtoId para cada item — cria se não existir
+      const itensResolvidos: {
+        produtoId: string;
+        quantidade: number;
+        precoUnitario: number;
+      }[] = [];
+
+      for (const item of dto.itens) {
+        if (item.produtoId) {
+          itensResolvidos.push({
+            produtoId: item.produtoId,
+            quantidade: item.quantidade,
+            precoUnitario: item.precoUnitario,
+          });
+        } else {
+          const codigoBarras = item.eanNfe || item.codigoProdutoNfe || null;
+          const produto = await tx.produto.create({
+            data: {
+              nome: item.nomeNfe || 'Produto importado',
+              categoria: 'Outro',
+              unidade: 'un',
+              codigoBarras,
+              precoCompra: item.precoUnitario,
+              quantidadeAtual: 0,
+              tenantId,
+            },
+          });
+          itensResolvidos.push({
+            produtoId: produto.id,
+            quantidade: item.quantidade,
+            precoUnitario: item.precoUnitario,
+          });
+        }
+      }
+
+      const entrada = await tx.entradaMercadoria.create({
+        data: {
+          numero,
+          tenantId,
+          fornecedorId: dto.fornecedorId ?? null,
+          observacoes: dto.observacoes ?? null,
+          status: 'Confirmada',
+          itens: {
+            create: itensResolvidos.map((item) => ({
+              produtoId: item.produtoId,
+              quantidade: item.quantidade,
+              precoUnitario: item.precoUnitario,
+              subtotal: item.quantidade * item.precoUnitario,
+              tenantId,
+            })),
+          },
+        },
+        include: {
+          fornecedor: { select: { id: true, nome: true } },
+          itens: {
+            include: {
+              produto: { select: { id: true, nome: true, unidade: true } },
+            },
+          },
+        },
+      });
+
+      for (const item of itensResolvidos) {
+        await tx.produto.update({
+          where: { id: item.produtoId },
+          data: {
+            quantidadeAtual: { increment: item.quantidade },
+            precoCompra: item.precoUnitario,
+          },
+        });
+
+        await tx.movimentacao.create({
+          data: {
+            tipo: 'Entrada',
+            quantidade: item.quantidade,
+            precoUnitario: item.precoUnitario,
+            motivo: 'Entrada de mercadoria',
+            observacoes: `Entrada #${numero}`,
+            produtoId: item.produtoId,
+            fornecedorId: dto.fornecedorId ?? null,
+            entradaMercadoriaId: entrada.id,
+            usuarioId,
+            tenantId,
+          },
+        });
+      }
+
+      return entrada;
+    });
+  }
+
+  // ─── Parse XML (NF-e SEFAZ ou qualquer formato genérico) ────
 
   async parseNfeXml(
     tenantId: string,
@@ -268,25 +380,7 @@ export class EstoqueService {
       throw new BadRequestException('XML inválido ou corrompido');
     }
 
-    // Suporta nfeProc > NFe e NFe direto
-    const nfeProc = parsed['nfeProc'] as Record<string, unknown> | undefined;
-    const nfe = (nfeProc?.['NFe'] ?? parsed['NFe']) as
-      | Record<string, unknown>
-      | undefined;
-    if (!nfe) throw new BadRequestException('Arquivo não é uma NF-e válida');
-
-    const infNFe = nfe['infNFe'] as Record<string, unknown>;
-    if (!infNFe) throw new BadRequestException('NF-e sem infNFe');
-
-    const emit = infNFe['emit'] as Record<string, unknown>;
-    const xNome = emit?.['xNome'];
-    const emitente =
-      typeof xNome === 'string' ? xNome : 'Fornecedor desconhecido';
-
-    const detRaw = infNFe['det'];
-    const dets: Record<string, unknown>[] = Array.isArray(detRaw)
-      ? (detRaw as Record<string, unknown>[])
-      : [detRaw as Record<string, unknown>];
+    const toStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 
     // Busca todos os produtos do tenant para tentar vincular por EAN ou código
     const produtosTenant = await this.prisma.produto.findMany({
@@ -294,41 +388,270 @@ export class EstoqueService {
       select: { id: true, nome: true, codigoBarras: true },
     });
 
-    const toStr = (v: unknown): string => (typeof v === 'string' ? v : '');
+    const vincular = (ean: string, codigo: string) =>
+      (ean
+        ? produtosTenant.find((p) => p.codigoBarras && p.codigoBarras === ean)
+        : null) ??
+      produtosTenant.find((p) => p.codigoBarras && p.codigoBarras === codigo) ??
+      null;
 
-    const itens: NfeItemPreview[] = dets
-      .filter((d) => d?.['prod'])
-      .map((d) => {
-        const prod = d['prod'] as Record<string, unknown>;
-        const nomeNfe = toStr(prod['xProd']);
-        const eanNfe = toStr(prod['cEAN']).replace(/\D/g, '');
-        const codigoProdutoNfe = toStr(prod['cProd']);
-        const quantidade = Number(prod['qCom'] ?? 0);
-        const precoUnitario = Number(prod['vUnCom'] ?? 0);
+    // ── Formato NF-e (SEFAZ): nfeProc > NFe ou NFe direto ──
+    const nfeProc = parsed['nfeProc'] as Record<string, unknown> | undefined;
+    const nfe = (nfeProc?.['NFe'] ?? parsed['NFe']) as
+      | Record<string, unknown>
+      | undefined;
 
-        // Tenta vincular: 1) por EAN, 2) por código de produto
-        const vinculado =
-          (eanNfe
-            ? produtosTenant.find(
-                (p) => p.codigoBarras && p.codigoBarras === eanNfe,
-              )
-            : null) ??
-          produtosTenant.find(
-            (p) => p.codigoBarras && p.codigoBarras === codigoProdutoNfe,
-          ) ??
-          null;
+    if (nfe) {
+      const infNFe = nfe['infNFe'] as Record<string, unknown>;
+      if (!infNFe) throw new BadRequestException('NF-e sem infNFe');
 
-        return {
-          nomeNfe,
-          eanNfe,
-          codigoProdutoNfe,
-          quantidade,
-          precoUnitario,
-          produtoId: vinculado?.id ?? null,
-          produtoNome: vinculado?.nome ?? null,
-        };
-      });
+      const emit = infNFe['emit'] as Record<string, unknown>;
+      const xNome = emit?.['xNome'];
+      const emitente =
+        typeof xNome === 'string' ? xNome : 'Fornecedor desconhecido';
 
-    return { emitente, itens };
+      const detRaw = infNFe['det'];
+      const dets: Record<string, unknown>[] = Array.isArray(detRaw)
+        ? (detRaw as Record<string, unknown>[])
+        : [detRaw as Record<string, unknown>];
+
+      const itens: NfeItemPreview[] = dets
+        .filter((d) => d?.['prod'])
+        .map((d) => {
+          const prod = d['prod'] as Record<string, unknown>;
+          const nomeNfe = toStr(prod['xProd']);
+          const eanNfe = toStr(prod['cEAN']).replace(/\D/g, '');
+          const codigoProdutoNfe = toStr(prod['cProd']);
+          const quantidade = Number(prod['qCom'] ?? 0);
+          const precoUnitario = Number(prod['vUnCom'] ?? 0);
+          const vinculado = vincular(eanNfe, codigoProdutoNfe);
+          return {
+            nomeNfe,
+            eanNfe,
+            codigoProdutoNfe,
+            quantidade,
+            precoUnitario,
+            produtoId: vinculado?.id ?? null,
+            produtoNome: vinculado?.nome ?? null,
+          };
+        });
+
+      return { emitente, itens };
+    }
+
+    // ── Formato genérico: detecta qualquer lista de itens na árvore XML ──
+    const listaRaw = this.extrairListaItens(parsed);
+    if (listaRaw.length > 0) {
+      const itens: NfeItemPreview[] = listaRaw
+        .map((item) => {
+          const { nome, codigo, preco, quantidade } =
+            this.mapearCamposItem(item);
+          const vinculado = vincular('', codigo);
+          return {
+            nomeNfe: nome,
+            eanNfe: '',
+            codigoProdutoNfe: codigo,
+            quantidade,
+            precoUnitario: preco,
+            produtoId: vinculado?.id ?? null,
+            produtoNome: vinculado?.nome ?? null,
+          };
+        })
+        .filter((i) => i.nomeNfe.trim().length > 0);
+
+      if (itens.length > 0) {
+        return { emitente: 'Importação manual', itens };
+      }
+    }
+
+    throw new BadRequestException(
+      'Formato de XML não reconhecido. Envie uma NF-e válida ou um arquivo com lista de produtos.',
+    );
+  }
+
+  // ─── BFS para encontrar a primeira lista de itens na árvore XML ─────────
+
+  private extrairListaItens(
+    obj: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    return this.bfsArray(obj) ?? this.bfsItemUnico(obj) ?? [];
+  }
+
+  private bfsArray(
+    raiz: Record<string, unknown>,
+  ): Record<string, unknown>[] | null {
+    const fila: unknown[] = [raiz];
+    while (fila.length > 0) {
+      const atual = fila.shift();
+      if (!atual || typeof atual !== 'object' || Array.isArray(atual)) continue;
+      const record = atual as Record<string, unknown>;
+      const arr = this.arrayFilhos(record);
+      if (arr) return arr;
+      for (const val of Object.values(record)) {
+        if (val && typeof val === 'object' && !Array.isArray(val))
+          fila.push(val);
+      }
+    }
+    return null;
+  }
+
+  private arrayFilhos(
+    record: Record<string, unknown>,
+  ): Record<string, unknown>[] | null {
+    for (const val of Object.values(record)) {
+      if (!Array.isArray(val)) continue;
+      const arr = (val as unknown[]).filter(
+        (v) => v && typeof v === 'object' && !Array.isArray(v),
+      ) as Record<string, unknown>[];
+      if (arr.length > 0) return arr;
+    }
+    return null;
+  }
+
+  private bfsItemUnico(
+    raiz: Record<string, unknown>,
+  ): Record<string, unknown>[] | null {
+    const fila: unknown[] = [raiz];
+    while (fila.length > 0) {
+      const atual = fila.shift();
+      if (!atual || typeof atual !== 'object' || Array.isArray(atual)) continue;
+      const record = atual as Record<string, unknown>;
+      const vals = Object.values(record);
+      const isPrimitivo = (v: unknown) => v === null || typeof v !== 'object';
+      if (
+        vals.length >= 2 &&
+        vals.every(isPrimitivo) &&
+        this.pareceProduto(record)
+      ) {
+        return [record];
+      }
+      for (const val of vals) {
+        if (val && typeof val === 'object' && !Array.isArray(val))
+          fila.push(val);
+      }
+    }
+    return null;
+  }
+
+  // ─── Verifica se um objeto tem cara de produto ───────────────────────────
+
+  private pareceProduto(item: Record<string, unknown>): boolean {
+    const nomesSinonimos = new Set([
+      'nome',
+      'name',
+      'produto',
+      'descricao',
+      'description',
+      'titulo',
+      'title',
+      'item',
+      'desc',
+      'label',
+      'xprod',
+    ]);
+    return Object.keys(item).some((k) => nomesSinonimos.has(k.toLowerCase()));
+  }
+
+  // ─── Mapeia campos de item XML genérico por sinônimos ───────────────────
+
+  private mapearCamposItem(item: Record<string, unknown>): {
+    nome: string;
+    codigo: string;
+    preco: number;
+    quantidade: number;
+  } {
+    const toStr = (v: unknown): string => {
+      if (typeof v === 'string') return v;
+      if (typeof v === 'number') return String(v);
+      return '';
+    };
+    const toNum = (v: unknown) =>
+      Number(
+        toStr(v)
+          .replace(',', '.')
+          .replace(/[^\d.]/g, ''),
+      ) || 0;
+
+    const encontrar = (...sinonimos: string[]): string => {
+      for (const s of sinonimos) {
+        const key = Object.keys(item).find(
+          (k) => k.toLowerCase() === s.toLowerCase(),
+        );
+        if (key !== undefined && item[key] != null) return toStr(item[key]);
+      }
+      return '';
+    };
+
+    const encontrarNum = (...sinonimos: string[]): number => {
+      for (const s of sinonimos) {
+        const key = Object.keys(item).find(
+          (k) => k.toLowerCase() === s.toLowerCase(),
+        );
+        if (key !== undefined && item[key] != null) return toNum(item[key]);
+      }
+      return 0;
+    };
+
+    return {
+      nome: encontrar(
+        'nome',
+        'name',
+        'produto',
+        'descricao',
+        'description',
+        'xProd',
+        'titulo',
+        'title',
+        'item',
+        'desc',
+        'label',
+      ),
+      codigo: encontrar(
+        'codigo',
+        'code',
+        'cod',
+        'ean',
+        'barcode',
+        'codigoBarras',
+        'cEAN',
+        'cProd',
+        'sku',
+        'id',
+        'ref',
+        'referencia',
+        'gtin',
+      ),
+      preco: encontrarNum(
+        'preco',
+        'price',
+        'valor',
+        'value',
+        'vUnCom',
+        'precoUnitario',
+        'preco_unitario',
+        'custo',
+        'cost',
+        'precoCompra',
+        'preco_compra',
+        'unitPrice',
+        'unit_price',
+        'precoVenda',
+        'precovenda',
+      ),
+      quantidade: encontrarNum(
+        'estoque',
+        'quantidade',
+        'qtd',
+        'quantity',
+        'qty',
+        'qCom',
+        'stock',
+        'quant',
+        'saldo',
+        'amount',
+        'inventario',
+        'inventory',
+      ),
+    };
   }
 }

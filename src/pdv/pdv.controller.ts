@@ -9,10 +9,45 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { IsInt, IsNumber, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { PdvService } from './pdv.service';
 import { CreateVendaDto } from './dto/create-venda.dto';
+
+class ConfiguracaoBalancaDto {
+  @IsString()
+  prefixo: string;
+
+  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(12)
+  @Type(() => Number)
+  posCodigo: number;
+
+  @IsNumber()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Type(() => Number)
+  tamCodigo: number;
+
+  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(12)
+  @Type(() => Number)
+  posValor: number;
+
+  @IsNumber()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @Type(() => Number)
+  tamValor: number;
+}
 
 @ApiTags('PDV')
 @ApiBearerAuth()
@@ -77,5 +112,20 @@ export class PdvController {
     @Param('id') id: string,
   ) {
     return this.pdvService.cancelar(usuario.tenantId, id);
+  }
+
+  // ─── Configuração de balança ─────────────────────────────────
+
+  @Get('configuracao-balanca')
+  getConfiguracaoBalanca(@UsuarioAtual() usuario: { tenantId: string }) {
+    return this.pdvService.getConfiguracaoBalanca(usuario.tenantId);
+  }
+
+  @Patch('configuracao-balanca')
+  salvarConfiguracaoBalanca(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Body() dto: ConfiguracaoBalancaDto,
+  ) {
+    return this.pdvService.salvarConfiguracaoBalanca(usuario.tenantId, dto);
   }
 }

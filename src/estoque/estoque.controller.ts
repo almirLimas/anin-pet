@@ -10,7 +10,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import {
+  IsArray,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { UsuarioAtual } from '../common/decorators/usuario-atual.decorator';
 import { EstoqueService } from './estoque.service';
@@ -18,6 +26,49 @@ import { EstoqueService } from './estoque.service';
 class ParseNfeDto {
   @IsString()
   xml: string;
+}
+
+class ImportarNfeItemDto {
+  @IsOptional()
+  @IsString()
+  produtoId?: string;
+
+  @IsOptional()
+  @IsString()
+  nomeNfe?: string;
+
+  @IsOptional()
+  @IsString()
+  eanNfe?: string;
+
+  @IsOptional()
+  @IsString()
+  codigoProdutoNfe?: string;
+
+  @IsNumber()
+  @Min(0.001)
+  @Type(() => Number)
+  quantidade: number;
+
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  precoUnitario: number;
+}
+
+class ImportarNfeDto {
+  @IsOptional()
+  @IsString()
+  fornecedorId?: string;
+
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ImportarNfeItemDto)
+  itens: ImportarNfeItemDto[];
 }
 import { CreateProdutoDto } from './dto/create-produto.dto';
 import { UpdateProdutoDto } from './dto/update-produto.dto';
@@ -136,6 +187,14 @@ export class EstoqueController {
     @UsuarioAtual() usuario: { tenantId: string },
   ) {
     return this.estoqueService.parseNfeXml(usuario.tenantId, dto.xml);
+  }
+
+  @Post('entradas/importar-nfe')
+  importarNfe(
+    @Body() dto: ImportarNfeDto,
+    @UsuarioAtual() usuario: { id: string; tenantId: string },
+  ) {
+    return this.estoqueService.importarNfe(usuario.tenantId, usuario.id, dto);
   }
 
   @Post('entradas')

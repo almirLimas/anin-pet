@@ -244,44 +244,70 @@ export class PdvService {
 
   // ─── Buscar produto por código de barras (scan de etiqueta) ──
 
-  /**
-   * Suporta dois formatos de etiqueta de balança EAN-13 com prefixo "2":
-   *
-   * Formato A — PLU 6 dígitos + preço (ex: Filizola/Toledo com preço embutido):
-   *   2 PPPPPP VVVVV C   → PLU=pos2-7, preço_centavos=pos8-12, check=pos13
-   *   Exemplo: 2993600003701 → PLU=993600, preço=R$3,70
-   *
-   * Formato B — PLU 5 dígitos + peso em gramas:
-   *   2 PPPPP WWWWW CC   → PLU=pos2-6, peso_gramas=pos7-11, checks=pos12-13
-   */
-  private parsearEtiquetaBalanca(codigo: string): {
+  // Configuração padrão: Toledo / Filizola (PLU 6 dígitos + preço 5 dígitos)
+  private static readonly CONFIG_BALANCA_PADRAO = {
+    prefixo: '2',
+    posCodigo: 1,
+    tamCodigo: 6,
+    posValor: 7,
+    tamValor: 5,
+  };
+
+  private resolverConfigBalanca(
+    raw: unknown,
+  ): typeof PdvService.CONFIG_BALANCA_PADRAO {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      return PdvService.CONFIG_BALANCA_PADRAO;
+    }
+    const r = raw as Record<string, unknown>;
+    return {
+      prefixo:
+        typeof r['prefixo'] === 'string'
+          ? r['prefixo']
+          : PdvService.CONFIG_BALANCA_PADRAO.prefixo,
+      posCodigo:
+        typeof r['posCodigo'] === 'number'
+          ? r['posCodigo']
+          : PdvService.CONFIG_BALANCA_PADRAO.posCodigo,
+      tamCodigo:
+        typeof r['tamCodigo'] === 'number'
+          ? r['tamCodigo']
+          : PdvService.CONFIG_BALANCA_PADRAO.tamCodigo,
+      posValor:
+        typeof r['posValor'] === 'number'
+          ? r['posValor']
+          : PdvService.CONFIG_BALANCA_PADRAO.posValor,
+      tamValor:
+        typeof r['tamValor'] === 'number'
+          ? r['tamValor']
+          : PdvService.CONFIG_BALANCA_PADRAO.tamValor,
+    };
+  }
+
+  private parsearEtiquetaBalanca(
+    codigo: string,
+    cfg: typeof PdvService.CONFIG_BALANCA_PADRAO,
+  ): {
     plu: string;
     precoBalanca: number | null;
     quantidadeKg: number | null;
   } | null {
-    if (codigo.length !== 13 || !codigo.startsWith('2')) return null;
+    if (codigo.length !== 13 || !codigo.startsWith(cfg.prefixo)) return null;
 
-    // Formato A: PLU 6 dígitos + preço embutido
-    const plu6 = codigo.substring(1, 7);
-    const precoStr = codigo.substring(7, 12);
-    const precoCentavos = Number.parseInt(precoStr, 10);
-    if (!Number.isNaN(precoCentavos) && precoCentavos > 0) {
-      return {
-        plu: plu6,
-        precoBalanca: precoCentavos / 100,
-        quantidadeKg: null,
-      };
-    }
+    const plu = codigo.substring(cfg.posCodigo, cfg.posCodigo + cfg.tamCodigo);
+    const valorStr = codigo.substring(
+      cfg.posValor,
+      cfg.posValor + cfg.tamValor,
+    );
+    const valor = Number.parseInt(valorStr, 10);
+    if (Number.isNaN(valor) || valor === 0) return null;
 
-    // Formato B: PLU 5 dígitos + peso em gramas
-    const plu5 = codigo.substring(1, 6);
-    const pesoStr = codigo.substring(6, 11);
-    const pesoGramas = Number.parseInt(pesoStr, 10);
-    if (!Number.isNaN(pesoGramas) && pesoGramas > 0) {
-      return { plu: plu5, precoBalanca: null, quantidadeKg: pesoGramas / 1000 };
-    }
-
-    return null;
+    // Heurística: se o campo de valor parece peso (>= 5 dígitos com zeros no início)
+    // usamos como peso em gramas; caso contrário, preço em centavos
+    const esPeso = valorStr.startsWith('0') && valor < 10000;
+    return esPeso
+      ? { plu, precoBalanca: null, quantidadeKg: valor / 1000 }
+      : { plu, precoBalanca: valor / 100, quantidadeKg: null };
   }
 
   async buscarPorBarcode(tenantId: string, codigo: string) {
@@ -293,8 +319,14 @@ export class PdvService {
       return { ...produtoExato, quantidadeBalanca: null, precoBalanca: null };
     }
 
-    // 2. Tenta interpretar como etiqueta de balança (EAN-13 prefixo 2)
-    const balanca = this.parsearEtiquetaBalanca(codigo);
+    // 2. Carrega config de balança do tenant e tenta interpretar como etiqueta
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { configuracaoBalanca: true },
+    });
+    const cfg = this.resolverConfigBalanca(tenant?.configuracaoBalanca);
+    const balanca = this.parsearEtiquetaBalanca(codigo, cfg);
+
     if (balanca) {
       const produto = await this.prisma.produto.findFirst({
         where: { tenantId, codigoBarras: balanca.plu, ativo: true },
@@ -306,11 +338,41 @@ export class PdvService {
           precoBalanca: balanca.precoBalanca,
         };
       }
+      throw new NotFoundException(
+        `Etiqueta de balança detectada — PLU "${balanca.plu}" não está cadastrado. Abra o produto correto e salve o Código de Barras como "${balanca.plu}".`,
+      );
     }
 
     throw new NotFoundException(
-      'Produto não encontrado para este código de barras',
+      `Código "${codigo}" não encontrado. Verifique se o produto está cadastrado com esse Código de Barras.`,
     );
+  }
+
+  // ─── Configuração de balança ────────────────────────────────
+
+  async getConfiguracaoBalanca(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { configuracaoBalanca: true },
+    });
+    return this.resolverConfigBalanca(tenant?.configuracaoBalanca);
+  }
+
+  async salvarConfiguracaoBalanca(
+    tenantId: string,
+    cfg: {
+      prefixo: string;
+      posCodigo: number;
+      tamCodigo: number;
+      posValor: number;
+      tamValor: number;
+    },
+  ) {
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { configuracaoBalanca: cfg },
+    });
+    return cfg;
   }
 
   // ─── Listar vendas ──────────────────────────────────────────
