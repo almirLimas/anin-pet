@@ -528,6 +528,35 @@ export class AgendaService {
         );
       }
 
+      // Alerta interno para o admin
+      const tenant = await this.prisma.tenant
+        .findUnique({
+          where: { id: tenantId },
+          select: { nome: true },
+        })
+        .catch(() => null);
+      const totalServicos = atualizado.servicos.reduce(
+        (sum, as) => sum + Number(as.servico.preco),
+        0,
+      );
+      const taxaBusca = atualizado.taxaBusca ? Number(atualizado.taxaBusca) : 0;
+      this.email
+        .enviarAlertaAgendamentoConcluido({
+          nomePetshop: tenant?.nome ?? tenantId,
+          tenantId,
+          nomeCliente: atualizado.cliente.nome,
+          nomePet: atualizado.pet.nome,
+          servicos: atualizado.servicos.map((as) => as.servico.nome).join(', '),
+          formaPagamento: restDto.formaPagamento ?? null,
+          valor: totalServicos + taxaBusca,
+        })
+        .catch((err: unknown) =>
+          this.logger.error(
+            '[Admin] Falha ao enviar alerta de agendamento',
+            String(err),
+          ),
+        );
+
       // Pesquisa de satisfação: imediata ou agendada para 1 hora
       if (clienteJaBuscou === false) {
         // Cliente ainda não está com o pet — avisa que está pronto e agenda avaliação para 1 hora
