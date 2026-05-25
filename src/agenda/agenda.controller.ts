@@ -84,6 +84,22 @@ export class AgendaController {
     return this.agendaService.concluidosSemanaEMes(usuario.tenantId);
   }
 
+  @Get('recentes')
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Número de registros (padrão 5)',
+  })
+  recentes(
+    @UsuarioAtual() usuario: { tenantId: string },
+    @Query('limit') limit?: string,
+  ) {
+    return this.agendaService.recentes(
+      usuario.tenantId,
+      limit ? Number(limit) : 5,
+    );
+  }
+
   @Get('resumo-mes')
   @ApiQuery({ name: 'mes', required: true, description: 'YYYY-MM' })
   resumoMes(

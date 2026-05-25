@@ -76,6 +76,15 @@ export class AgendaService {
     });
   }
 
+  async recentes(tenantId: string, limit = 5) {
+    return this.prisma.agendamento.findMany({
+      where: { tenantId, status: 'Concluido' },
+      orderBy: { dataHora: 'desc' },
+      take: limit,
+      include: this.include,
+    });
+  }
+
   async concluidosSemanaEMes(tenantId: string): Promise<{
     semana: number;
     mes: number;
