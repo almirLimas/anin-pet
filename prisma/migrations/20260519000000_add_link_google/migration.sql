@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Tenant" ADD COLUMN "linkGoogle" TEXT;
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "linkGoogle" TEXT;

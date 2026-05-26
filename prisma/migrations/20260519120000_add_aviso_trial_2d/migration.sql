@@ -1,1 +1,1 @@
-ALTER TABLE "Tenant" ADD COLUMN "avisoTrial2dEnviadoEm" TIMESTAMP(3);
+ALTER TABLE "Tenant" ADD COLUMN IF NOT EXISTS "avisoTrial2dEnviadoEm" TIMESTAMP(3);
