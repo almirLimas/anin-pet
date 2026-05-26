@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class AtualizarPerfilDto {
   @ApiPropertyOptional()
@@ -11,6 +11,14 @@ export class AtualizarPerfilDto {
   @IsOptional()
   @IsString()
   telefone?: string;
+
+  @ApiPropertyOptional({
+    description: 'Foto de perfil como data URL (base64) ou URL pública',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000_000)
+  fotoPerfil?: string | null;
 
   @ApiPropertyOptional({
     description: 'Senha atual (obrigatória para trocar senha)',

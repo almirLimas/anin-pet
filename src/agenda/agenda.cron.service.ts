@@ -41,14 +41,22 @@ export class AgendaCronService {
     });
 
     for (const tenant of tenants) {
-      // Clientes do tenant que possuem telefone e tiveram agendamento concluído
+      // Clientes do tenant que possuem telefone e tiveram agendamento
+      // passado que não foi cancelado (independente de estar marcado como Concluido)
+      const agora = new Date();
       const clientes = await this.prisma.cliente.findMany({
         where: {
           tenantId: tenant.id,
           telefonePrincipal: { not: '' },
           agendamentos: {
             some: {
-              status: StatusAgendamento.Concluido,
+              status: {
+                notIn: [
+                  StatusAgendamento.Cancelado,
+                  StatusAgendamento.NaoCompareceu,
+                ],
+              },
+              dataHora: { lt: agora },
             },
           },
         },
@@ -57,12 +65,36 @@ export class AgendaCronService {
           nome: true,
           telefonePrincipal: true,
           agendamentos: {
-            where: { status: StatusAgendamento.Concluido },
+            where: {
+              status: {
+                notIn: [
+                  StatusAgendamento.Cancelado,
+                  StatusAgendamento.NaoCompareceu,
+                ],
+              },
+              dataHora: { lt: agora },
+            },
             orderBy: { dataHora: 'desc' },
             take: 1,
             select: {
               dataHora: true,
               pet: { select: { nome: true } },
+            },
+          },
+          // Busca se o cliente já tem agendamento futuro para evitar enviar lembrete desnecessário
+          _count: {
+            select: {
+              agendamentos: {
+                where: {
+                  status: {
+                    notIn: [
+                      StatusAgendamento.Cancelado,
+                      StatusAgendamento.NaoCompareceu,
+                    ],
+                  },
+                  dataHora: { gte: agora },
+                },
+              },
             },
           },
         },
@@ -73,6 +105,9 @@ export class AgendaCronService {
         if (!cliente.telefonePrincipal) continue;
         const ultimoAgendamento = (cliente as any).agendamentos?.[0];
         if (!ultimoAgendamento) continue;
+
+        // Não envia se o cliente já tem agendamento futuro marcado
+        if ((cliente as any)._count?.agendamentos > 0) continue;
 
         // Só envia se o último agendamento foi há mais de X dias
         if (ultimoAgendamento.dataHora > limiteData) continue;

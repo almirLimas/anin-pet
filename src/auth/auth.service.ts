@@ -234,6 +234,7 @@ export class AuthService {
     if (dto.nomeCompleto) data.nomeCompleto = dto.nomeCompleto;
     if (dto.telefone) data.telefone = dto.telefone;
     if (dto.novaSenha) data.senhaHash = await bcrypt.hash(dto.novaSenha, 10);
+    if (dto.fotoPerfil !== undefined) data.fotoPerfil = dto.fotoPerfil;
 
     const atualizado = await this.prisma.usuario.update({
       where: { id: usuarioId },
@@ -244,6 +245,7 @@ export class AuthService {
         email: true,
         telefone: true,
         perfil: true,
+        fotoPerfil: true,
       },
     });
 
@@ -258,6 +260,7 @@ export class AuthService {
         nomeCompleto: true,
         email: true,
         telefone: true,
+        fotoPerfil: true,
         perfil: true,
         status: true,
         tenantId: true,
@@ -281,6 +284,7 @@ export class AuthService {
 
     return {
       ...usuario,
+      avatar: usuario.fotoPerfil ?? undefined,
       nomePetshop: usuario.tenant.nome,
       plano: usuario.tenant.plano,
       assinaturaStatus: usuario.tenant.assinaturaStatus,

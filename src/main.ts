@@ -13,12 +13,18 @@ async function bootstrap() {
       .map((o) => o.trim().replace(/\/$/, '')),
   );
 
+  const isDev = process.env.NODE_ENV !== 'production';
+
   app.enableCors({
     origin: (
       origin: string | undefined,
       callback: (err: Error | null, allow?: boolean) => void,
     ) => {
-      if (!origin || allowedOrigins.has(origin)) {
+      if (!origin) return callback(null, true);
+      if (isDev && /^http:\/\/localhost:\d+$/.test(origin)) {
+        return callback(null, true);
+      }
+      if (allowedOrigins.has(origin)) {
         callback(null, true);
       } else {
         callback(new Error(`CORS: origin not allowed — ${origin}`));

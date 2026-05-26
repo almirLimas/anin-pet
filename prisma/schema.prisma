@@ -99,6 +99,7 @@ model Usuario {
   email              String        @unique
   cpf                String?       @unique
   telefone           String?
+  fotoPerfil         String?
   senhaHash          String
   perfil             Perfil        @default(admin)
   status             StatusUsuario @default(ativo)
