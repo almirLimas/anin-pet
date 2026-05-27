@@ -272,11 +272,20 @@ export class AgendaService {
       Array.from({ length: semanas }, (_, i) => {
         const dt = new Date(base);
         dt.setDate(dt.getDate() + i * 7);
-        dt.setHours(hora, minuto, 0, 0);
+        // Constrói o datetime em horário de Brasília (UTC-3) para evitar
+        // deslocamento quando o servidor roda em UTC
+        const ano = dt.getFullYear();
+        const mes = String(dt.getMonth() + 1).padStart(2, '0');
+        const dia = String(dt.getDate()).padStart(2, '0');
+        const hStr = String(hora).padStart(2, '0');
+        const mStr = String(minuto).padStart(2, '0');
+        const dataHora = new Date(
+          `${ano}-${mes}-${dia}T${hStr}:${mStr}:00-03:00`,
+        );
         return this.prisma.agendamento.create({
           data: {
             recorrenciaId,
-            dataHora: dt,
+            dataHora: dataHora,
             clienteId: dto.clienteId,
             petId: dto.petId,
             tenantId,

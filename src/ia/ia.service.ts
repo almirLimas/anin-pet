@@ -567,6 +567,38 @@ const TOOLS: ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'buscar_clientes_inativos',
+      description:
+        'Lista clientes que não têm agendamento concluído há X dias. Use para responder perguntas como "quem não vem há 30 dias", "clientes sumidos", "quem não voltou", "recuperação de clientes".',
+      parameters: {
+        type: 'object',
+        properties: {
+          dias: {
+            type: 'number',
+            description:
+              'Número de dias de inatividade (padrão: 30). Ex: 30, 45, 60, 90.',
+          },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'prever_receita_semana',
+      description:
+        'Calcula a receita prevista com base nos agendamentos já marcados para os próximos 7 dias (ou semana corrente). Use para responder "quanto vou faturar essa semana", "previsão de receita", "quanto tenho de agendamentos marcados".',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
 
 @Injectable()
@@ -616,9 +648,11 @@ export class IaService {
       this.notificarChatIA(tenantId, usuarioId).catch(() => {});
     }
 
-    const agora = new Date().toLocaleString('pt-BR', {
-      timeZone: 'America/Sao_Paulo',
-    });
+    const _now = new Date();
+    const _br = new Date(_now.getTime() - 3 * 60 * 60 * 1000);
+    const agora =
+      _br.toISOString().slice(0, 16).replace('T', ' ') +
+      ' (Horário de Brasília, UTC-3)';
 
     const systemPrompt = `Você se chama Anin. Sempre que se apresentar ou for perguntado seu nome, diga apenas "Anin". Nunca use "Assistente AninPet" ou qualquer outro nome.
 Você é a assistente inteligente do sistema AninPet, um sistema completo para pet shop.
@@ -792,6 +826,8 @@ REGRAS PARA CONSULTAS:
 7. Use consultar_estoque para perguntas sobre produtos e estoque, passando o nome do produto quando mencionado.
 8. Use buscar_pets para buscar pets por nome.
 9. Use consultar_avaliacoes para perguntas sobre satisfação e avaliações.
+10. Use buscar_clientes_inativos para perguntas como "quem não vem há X dias", "clientes sumidos", "recuperar clientes", "quem não voltou". O padrão é 30 dias se não especificado.
+11. Use prever_receita_semana para perguntas como "quanto vou faturar essa semana", "previsão de receita", "quanto tenho marcado para os próximos dias".
 
 REGRAS PARA CADASTROS:
 1. NUNCA chame cadastrar_cliente sem ter coletado: nome, WhatsApp, CEP, rua, número, bairro, cidade, estado E os dados de pelo menos um pet.
@@ -929,7 +965,7 @@ FLUXO PARA CRIAÇÃO DE AGENDAMENTO:
      → Ao confirmar, mostre o resumo: quantos agendamentos foram criados, qual dia da semana, período (primeiro ao último), e informe que a cobrança da mensalidade é gerada automaticamente a cada 4 sessões concluídas.
    - Se o cliente NÃO for mensalista:
      → Use o fluxo normal abaixo com criar_agendamento
-7. (Apenas para não-mensalistas) Pergunte a data e hora do agendamento (valide: deve ser no futuro)
+7. (Apenas para não-mensalistas) Pergunte a data e hora do agendamento. Regra de validação: aceite qualquer horário de hoje ou de dias futuros. NUNCA rejeite um horário só porque ele é anterior à hora atual do dia — o pet shop pode estar registrando um atendimento que já aconteceu ou que vai acontecer em breve. Só rejeite se a DATA for de um dia anterior ao dia de hoje.
 8. Pergunte a modalidade apresentando as opções assim (sem asteriscos, com emoji):
    🐾 Cliente traz → O cliente leva o pet até o pet shop.
    🚗 Pet shop busca → O pet shop vai buscar o pet na casa do cliente.
@@ -1701,27 +1737,22 @@ Data e hora atual: ${agora}.`;
             }
           }
 
-          return await this.prisma.agendamento.create({
-            data: {
-              tenantId,
-              clienteId: str(args.clienteId),
-              petId: str(args.petId),
-              dataHora: new Date(str(args.dataHora)),
-              modalidade,
-              enderecoBusca,
-              observacoes: optStr(args.observacoes),
-              status: 'Agendado',
-              servicos: {
-                createMany: {
-                  data: servicoIds.map((id) => ({ servicoId: id })),
-                },
-              },
-            },
-            include: {
-              cliente: { select: { nome: true } },
-              pet: { select: { nome: true } },
-              servicos: { include: { servico: { select: { nome: true } } } },
-            },
+          // Se não tem offset de timezone, assume horário de Brasília (UTC-3)
+          const dataHoraStr = str(args.dataHora);
+          const dataHoraNormalizada = /Z$|[+-]\d{2}:?\d{2}$/.test(dataHoraStr)
+            ? dataHoraStr
+            : `${dataHoraStr}-03:00`;
+
+          // Usa agenda.create para garantir auto-atribuição de gaiola e notificações
+          return await this.agenda.create(tenantId, {
+            clienteId: str(args.clienteId),
+            petId: str(args.petId),
+            servicoIds,
+            dataHora: dataHoraNormalizada,
+            modalidade,
+            enderecoBusca,
+            observacoes: optStr(args.observacoes),
+            status: 'Agendado',
           });
         }
 
@@ -1794,6 +1825,115 @@ Data e hora atual: ${agora}.`;
 
         default:
           return { erro: `Ferramenta "${nome}" não reconhecida` };
+
+        case 'buscar_clientes_inativos': {
+          const dias = args.dias ? Number(args.dias) : 30;
+          const limite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
+
+          // Busca o último agendamento concluído de cada cliente em uma única query
+          // agrupando por clienteId e pegando o MAX(dataHora)
+          const ultimasVisitas = await this.prisma.$queryRaw<
+            {
+              clienteId: string;
+              nome: string;
+              telefonePrincipal: string | null;
+              ultimaVisita: Date;
+            }[]
+          >`
+            SELECT
+              a."clienteId",
+              c.nome,
+              c."telefonePrincipal",
+              MAX(a."dataHora") AS "ultimaVisita"
+            FROM "Agendamento" a
+            JOIN "Cliente" c ON c.id = a."clienteId"
+            WHERE a."tenantId" = ${tenantId}
+              AND a.status = 'Concluido'
+            GROUP BY a."clienteId", c.nome, c."telefonePrincipal"
+            HAVING MAX(a."dataHora") < ${limite}
+            ORDER BY MAX(a."dataHora") DESC
+            LIMIT 30
+          `;
+
+          const inativos = ultimasVisitas.map((r) => ({
+            nome: r.nome,
+            telefone: r.telefonePrincipal ?? '',
+            ultimaVisita: new Date(r.ultimaVisita).toLocaleDateString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+            }),
+            diasSemVir: Math.floor(
+              (Date.now() - new Date(r.ultimaVisita).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
+          }));
+
+          return {
+            total: inativos.length,
+            diasConsiderado: dias,
+            clientes: inativos,
+            dica: 'Para cada cliente, você pode enviar uma mensagem de retorno pelo WhatsApp usando o telefone listado.',
+          };
+        }
+
+        case 'prever_receita_semana': {
+          const agora = new Date();
+          const fimSemana = new Date(agora.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+          const agendamentos = await this.prisma.agendamento.findMany({
+            where: {
+              tenantId,
+              dataHora: { gte: agora, lte: fimSemana },
+              status: { notIn: ['Cancelado', 'NaoCompareceu'] },
+            },
+            include: {
+              cliente: { select: { nome: true } },
+              pet: { select: { nome: true } },
+              servicos: {
+                include: {
+                  servico: { select: { nome: true, preco: true } },
+                },
+              },
+            },
+            orderBy: { dataHora: 'asc' },
+          });
+
+          let totalPrevisto = 0;
+          const lista = agendamentos.map((a) => {
+            const valorServicos = a.servicos.reduce(
+              (sum, s) => sum + Number(s.servico.preco ?? 0),
+              0,
+            );
+            const taxa = Number(a.taxaBusca ?? 0);
+            const total = valorServicos + taxa;
+            totalPrevisto += total;
+            return {
+              data: a.dataHora.toLocaleDateString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+              }),
+              horario: a.dataHora.toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'America/Sao_Paulo',
+              }),
+              cliente: a.cliente.nome,
+              pet: a.pet.nome,
+              servicos: a.servicos.map((s) => s.servico.nome).join(', '),
+              valor: `R$ ${total.toFixed(2)}`,
+            };
+          });
+
+          const fmtBRL = (v: number) =>
+            v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+          return {
+            periodoConsiderado: `${agora.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })} até ${fimSemana.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+            totalAgendamentos: agendamentos.length,
+            totalPrevisto: fmtBRL(totalPrevisto),
+            agendamentos: lista,
+            observacao:
+              'Valores baseados nos preços atuais dos serviços. Agendamentos cancelados ou não compareceu não são contabilizados.',
+          };
+        }
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -1826,12 +1966,14 @@ Data e hora atual: ${agora}.`;
         return (
           (await this.mensagemMeta(tenantId)) ??
           (await this.mensagemAtendimentosSemana(tenantId)) ??
-          (await this.mensagemPetNaoVoltou(tenantId))
+          (await this.mensagemPetNaoVoltou(tenantId)) ??
+          (await this.mensagemEstoqueBaixo(tenantId))
         );
       }
       if (dow % 2 === 1) {
         // Seg, Qua, Sex
         return (
+          (await this.mensagemEstoqueBaixo(tenantId)) ??
           (await this.mensagemAtendimentosSemana(tenantId)) ??
           (await this.mensagemPetNaoVoltou(tenantId)) ??
           (await this.mensagemMeta(tenantId))
@@ -1841,6 +1983,7 @@ Data e hora atual: ${agora}.`;
       return (
         (await this.mensagemPetNaoVoltou(tenantId)) ??
         (await this.mensagemAtendimentosSemana(tenantId)) ??
+        (await this.mensagemEstoqueBaixo(tenantId)) ??
         (await this.mensagemMeta(tenantId))
       );
     } catch {
@@ -1991,6 +2134,43 @@ Data e hora atual: ${agora}.`;
     }
 
     return null;
+  }
+
+  private async mensagemEstoqueBaixo(
+    tenantId: string,
+  ): Promise<{ tipo: string; mensagem: string } | null> {
+    const produtos = await this.prisma.produto.findMany({
+      where: { tenantId, ativo: true },
+      select: {
+        nome: true,
+        quantidadeAtual: true,
+        estoqueMinimo: true,
+        unidade: true,
+      },
+    });
+
+    const baixos = produtos.filter((p) => p.quantidadeAtual <= p.estoqueMinimo);
+    if (baixos.length === 0) return null;
+
+    if (baixos.length === 1) {
+      const p = baixos[0];
+      return {
+        tipo: 'estoque',
+        mensagem: `🏪 Alerta de estoque: ${p.nome} está com apenas ${Number(p.quantidadeAtual)} ${p.unidade ?? 'un'} (mínimo: ${p.estoqueMinimo}). Hora de repor! 📦`,
+      };
+    }
+
+    const lista = baixos
+      .slice(0, 3)
+      .map(
+        (p) => `${p.nome} (${Number(p.quantidadeAtual)} ${p.unidade ?? 'un'})`,
+      )
+      .join(', ');
+    const sufixo = baixos.length > 3 ? ` e mais ${baixos.length - 3}` : '';
+    return {
+      tipo: 'estoque',
+      mensagem: `🏪 ${baixos.length} produto${baixos.length > 1 ? 's' : ''} com estoque baixo: ${lista}${sufixo}. Quer que eu liste todos? 📦`,
+    };
   }
 
   private async mensagemMeta(
