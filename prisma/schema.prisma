@@ -270,7 +270,7 @@ model Agendamento {
   updatedAt   DateTime               @updatedAt
 
   tenant       Tenant                @relation(fields: [tenantId], references: [id])
-  cliente      Cliente               @relation(fields: [clienteId], references: [id])
+  cliente      Cliente               @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   pet          Pet                   @relation(fields: [petId], references: [id])
   servicos     AgendamentoServico[]
   lancamentos  Lancamento[]
@@ -381,7 +381,7 @@ model AvaliacaoCliente {
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
   agendamento Agendamento @relation(fields: [agendamentoId], references: [id], onDelete: Cascade)
-  cliente     Cliente     @relation(fields: [clienteId], references: [id])
+  cliente     Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
 }
 
 // ── Estoque ──────────────────────────────────────────────────────────────────
@@ -511,7 +511,7 @@ model Venda {
   updatedAt      DateTime       @updatedAt
 
   tenant  Tenant     @relation(fields: [tenantId], references: [id])
-  cliente Cliente?   @relation(fields: [clienteId], references: [id])
+  cliente Cliente?   @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   itens   ItemVenda[]
   cupom   Cupom?     @relation(fields: [cupomId], references: [id])
 
@@ -621,7 +621,7 @@ model PacoteClienteAtivo {
 
   tenant  Tenant        @relation(fields: [tenantId], references: [id])
   pacote  PacoteServico @relation(fields: [pacoteId], references: [id])
-  cliente Cliente       @relation(fields: [clienteId], references: [id])
+  cliente Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   pet     Pet?          @relation(fields: [petId], references: [id])
   agendamentos Agendamento[]
 }
