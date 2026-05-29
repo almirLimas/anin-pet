@@ -37,10 +37,16 @@ export class AgendaCronService {
           in: [AssinaturaStatus.trial, AssinaturaStatus.ativa],
         },
       },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, whatsappEnviarLembrete: true },
     });
 
     for (const tenant of tenants) {
+      if (!tenant.whatsappEnviarLembrete) {
+        this.logger.log(
+          `[LembreteRetorno] Tenant ${tenant.nome} com lembrete desativado, pulando.`,
+        );
+        continue;
+      }
       // Clientes do tenant que possuem telefone e tiveram agendamento
       // passado que não foi cancelado (independente de estar marcado como Concluido)
       const agora = new Date();
@@ -163,9 +169,11 @@ export class AgendaCronService {
           in: [AssinaturaStatus.trial, AssinaturaStatus.ativa],
         },
       },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, whatsappEnviarLembrete: true },
     });
-    const tenantIds = tenants.map((t) => t.id);
+    const tenantIds = tenants
+      .filter((t) => t.whatsappEnviarLembrete)
+      .map((t) => t.id);
     const tenantNomes = Object.fromEntries(tenants.map((t) => [t.id, t.nome]));
 
     if (tenantIds.length === 0) {

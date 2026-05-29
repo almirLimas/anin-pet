@@ -578,6 +578,9 @@ export class AuthService {
         mensagemAvaliacao: true,
         mensagemPetPronto: true,
         linkGoogle: true,
+        whatsappEnviarConfirmacao: true,
+        whatsappEnviarLembrete: true,
+        whatsappEnviarAvaliacao: true,
       },
     });
     return {
@@ -591,6 +594,9 @@ export class AuthService {
         tenant.mensagemPetPronto ??
         'Olá, {nome}! 🐾 O {pet} já está prontinho e esperando por você!\n\nPode vir buscar quando quiser. 😊',
       linkGoogle: tenant.linkGoogle ?? null,
+      whatsappEnviarConfirmacao: tenant.whatsappEnviarConfirmacao,
+      whatsappEnviarLembrete: tenant.whatsappEnviarLembrete,
+      whatsappEnviarAvaliacao: tenant.whatsappEnviarAvaliacao,
     };
   }
 
@@ -601,6 +607,9 @@ export class AuthService {
       mensagemAvaliacao?: string;
       mensagemPetPronto?: string;
       linkGoogle?: string;
+      whatsappEnviarConfirmacao?: boolean;
+      whatsappEnviarLembrete?: boolean;
+      whatsappEnviarAvaliacao?: boolean;
     },
   ) {
     const admin = await this.prisma.usuario.findUniqueOrThrow({
@@ -626,6 +635,15 @@ export class AuthService {
         }),
         ...(dto.linkGoogle !== undefined && {
           linkGoogle: dto.linkGoogle || null,
+        }),
+        ...(dto.whatsappEnviarConfirmacao !== undefined && {
+          whatsappEnviarConfirmacao: dto.whatsappEnviarConfirmacao,
+        }),
+        ...(dto.whatsappEnviarLembrete !== undefined && {
+          whatsappEnviarLembrete: dto.whatsappEnviarLembrete,
+        }),
+        ...(dto.whatsappEnviarAvaliacao !== undefined && {
+          whatsappEnviarAvaliacao: dto.whatsappEnviarAvaliacao,
         }),
       },
     });

@@ -213,10 +213,18 @@ export class AgendaService {
     // Notificação WhatsApp ao cliente (apenas plano Plus)
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { mensagemAgendamento: true, plano: true },
+      select: {
+        mensagemAgendamento: true,
+        plano: true,
+        whatsappEnviarConfirmacao: true,
+      },
     });
     const telefone = agendamento.cliente.telefonePrincipal;
-    if (telefone && tenant?.plano === 'plus') {
+    if (
+      telefone &&
+      tenant?.plano === 'plus' &&
+      tenant.whatsappEnviarConfirmacao !== false
+    ) {
       const dataFormatada = agendamento.dataHora.toLocaleDateString('pt-BR', {
         day: '2-digit',
         month: '2-digit',
@@ -678,7 +686,12 @@ export class AgendaService {
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { nome: true, mensagemAvaliacao: true, plano: true },
+      select: {
+        nome: true,
+        mensagemAvaliacao: true,
+        plano: true,
+        whatsappEnviarAvaliacao: true,
+      },
     });
     const token = await this.avaliacoes.criarPendente(
       agendamentoId,
@@ -692,7 +705,11 @@ export class AgendaService {
       .replace(/\/$/, '');
     const linkAvaliacao = `${baseUrl}/avaliar/${token}`;
 
-    if (cliente.telefonePrincipal && tenant?.plano === 'plus') {
+    if (
+      cliente.telefonePrincipal &&
+      tenant?.plano === 'plus' &&
+      tenant.whatsappEnviarAvaliacao !== false
+    ) {
       const template =
         tenant?.mensagemAvaliacao ??
         'Olá, {nome}! 🐾 Esperamos que {pet} tenha adorado o serviço!\n\nPoderia avaliar o atendimento? Leva menos de 1 minuto 😊\n{link}';

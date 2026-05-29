@@ -58,10 +58,13 @@ model Tenant {
   avisoPixAte      DateTime?
   metaMensal            Decimal?  @db.Decimal(10, 2)
   taxaBusca             Decimal?  @db.Decimal(10, 2)
-  mensagemAgendamento   String?
-  mensagemAvaliacao     String?
-  mensagemPetPronto     String?
-  linkGoogle            String?
+  mensagemAgendamento        String?
+  mensagemAvaliacao          String?
+  mensagemPetPronto          String?
+  linkGoogle                 String?
+  whatsappEnviarConfirmacao  Boolean   @default(true)
+  whatsappEnviarLembrete     Boolean   @default(true)
+  whatsappEnviarAvaliacao    Boolean   @default(true)
   totalGaiolas          Int       @default(10)
   configuracaoBalanca   Json?     // { prefixo, posCodigo, tamCodigo, posValor, tamValor }
   createdAt             DateTime  @default(now())

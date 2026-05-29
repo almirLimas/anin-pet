@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class AtualizarMensagemWhatsappDto {
@@ -41,4 +41,16 @@ export class AtualizarMensagemWhatsappDto {
   @IsString()
   @MaxLength(500)
   linkGoogle?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  whatsappEnviarConfirmacao?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  whatsappEnviarLembrete?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  whatsappEnviarAvaliacao?: boolean;
 }
